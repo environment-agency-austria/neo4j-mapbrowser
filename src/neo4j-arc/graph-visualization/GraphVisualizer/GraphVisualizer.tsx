@@ -19,7 +19,14 @@
  */
 import deepmerge from 'deepmerge'
 import { debounce } from 'lodash-es'
-import React, { Component } from 'react'
+import React, {
+  Component,
+  ReactNode,
+  useState,
+  FC,
+  useMemo,
+  useEffect
+} from 'react'
 
 import { Graph } from './Graph/Graph'
 import { NodeInspectorPanel, defaultPanelWidth } from './NodeInspectorPanel'
@@ -37,8 +44,189 @@ import { GetNodeNeighboursFn, VizItem } from '../types'
 import { GraphStats } from '../utils/mapper'
 import { GraphModel } from '../models/Graph'
 import { GraphInteractionCallBack } from './Graph/GraphEventHandlerModel'
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  GeoJSON,
+  useMap,
+  useMapEvent,
+  useMapEvents,
+  LayerGroup,
+  LayerGroupProps,
+  WMSTileLayer
+} from 'react-leaflet'
+import { GeoJsonObject, FeatureCollection } from 'geojson'
+
+import { WFS, GML } from 'ol/format'
+import GML32 from 'ol/format/GML32'
+import * as olProj from 'ol/proj'
+import { GeoJSON as OLGeoJson } from 'ol/format'
+import { register } from 'ol/proj/proj4'
+import * as proj4x from 'proj4'
+import VectorLayer from 'ol/layer/Vector'
+import { Feature } from 'ol'
+const proj4 = (proj4x as any).default
 
 const DEFAULT_MAX_NEIGHBOURS = 100
+
+type MapParentProps = {
+  zoomLevel: number
+  nodes: BasicNode[]
+}
+
+type MapParentState = {
+  geodata: GeoJsonObject
+  geoselection: GeoJsonObject
+  zoomLevel: number
+}
+
+type ZoomChangeProps = {
+  onZoomChange: Function
+}
+
+function ZoomHandler(props: ZoomChangeProps) {
+  const [zoomLevel, setZoomLevel] = useState(8)
+
+  const mapEvents = useMapEvents({
+    zoomend: () => {
+      setZoomLevel(mapEvents.getZoom())
+      props.onZoomChange(mapEvents.getZoom())
+    }
+  })
+
+  return null
+}
+
+async function fetchFeaturesFromGmlURL(gmlURL: string): Promise<GeoJsonObject> {
+  const parser = new WFS({
+    featureNS: 'http://mapserver.gis.umn.edu/mapserver',
+    version: '2.0.0'
+  })
+
+  return fetch(gmlURL)
+    .then(response => response.text())
+    .then(data => {
+      const wfsFeatures = parser.readFeatures(data)
+      const gmlString = new GML32({
+        srsName: 'urn:ogc:def:crs:EPSG::4326',
+        featureNS: 'swaat'
+      }).writeFeatures(wfsFeatures)
+
+      const gjs = JSON.parse(
+        new OLGeoJson().writeFeatures(wfsFeatures, {
+          featureProjection: 'EPSG:31287',
+          dataProjection: 'EPSG:4326'
+        })
+      ) as GeoJsonObject
+
+      return gjs
+    })
+}
+
+export const MapParent = (props: MapParentProps) => {
+  const onEachFeature = (feature: any, layer: any) => {
+    layer.on('click', () => {
+      //this.state.
+      const gmlId = feature.id
+      alert('Feature selected: ' + feature.id)
+      return null
+    })
+  }
+
+  const [zoomLevel, setZoomLevel] = useState(8)
+  const [geodata, setGeoData] = useState<GeoJsonObject>({ type: 'Feature' })
+  const [processedURLs, setProcessedURLs] = useState<string[]>([])
+
+  useEffect(() => {
+    const gmlURLs = props.nodes
+      .filter(node => 'gml:identifier' in node.properties)
+      .map(node => node.properties['gml:identifier'])
+
+    // check whether re-fetch is required at all
+    if (JSON.stringify(processedURLs) === JSON.stringify(gmlURLs)) {
+      return
+    }
+    setProcessedURLs(gmlURLs)
+
+    proj4.defs(
+      'EPSG:31287',
+      '+proj=lcc +axis=neu +lat_0=47.5 +lon_0=13.3333333333333 +lat_1=49 +lat_2=46 +x_0=400000 +y_0=400000 +ellps=bessel +towgs84=577.326,90.129,463.919,5.137,1.474,5.297,2.42319999999019 +units=m +no_defs +type=crs'
+    )
+    register(proj4)
+
+    const pendingFetches = gmlURLs.map(gmlURL => {
+      return fetchFeaturesFromGmlURL(gmlURL).catch(e =>
+        console.log('Error fetching url: ' + gmlURL + ' ' + e)
+      )
+    })
+
+    Promise.all(pendingFetches).then(f => {
+      try {
+        const loadedFeatureCollections = f as FeatureCollection[]
+        const featureCollection: FeatureCollection = {
+          type: 'FeatureCollection',
+          features: []
+        }
+        loadedFeatureCollections.forEach(lfc =>
+          featureCollection.features.push(lfc.features[0])
+        )
+        setGeoData(featureCollection)
+      } catch (e) {
+        console.log(e)
+      }
+    })
+  })
+
+  const position = [47.35, 13.63]
+
+  let layer
+  if (zoomLevel > 12) {
+    layer = (
+      <GeoJSON
+        key={Math.random()}
+        data={geodata}
+        // @ts-expect-error
+        onEachFeature={onEachFeature}
+        pathOptions={{ color: 'blue', weight: 1 }}
+      />
+    )
+  } else {
+    layer = (
+      <WMSTileLayer
+        url="http://swwat.grillmayer.eu:8080/geoserver/ows?SERVICE=WMS&"
+        params={{
+          layers: 'swwat:GefahrenzonenPublic',
+          transparent: true,
+          format: 'image/png'
+        }}
+      />
+    )
+  }
+
+  return (
+    <div style={{ width: '100%', height: '100%' }}>
+      {zoomLevel}
+      <MapContainer
+        style={{ width: '100%', height: '100%', zIndex: 1 }}
+        center={position}
+        zoom={8}
+        scrollWheelZoom={true}
+      >
+        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        {layer}
+
+        <ZoomHandler onZoomChange={setZoomLevel} />
+
+        {/*<GeoJSON key={Math.random()} data={null}  
+                  // @ts-expect-error
+                  onEachFeature={onEachFeature} 
+pathOptions={{ color: 'red', weight : 1 }}/> */}
+      </MapContainer>
+    </div>
+  )
+}
 
 type GraphVisualizerDefaultProps = {
   maxNeighbours: number
@@ -210,6 +398,26 @@ export class GraphVisualizer extends Component<
 
   onItemSelect(selectedItem: VizItem): void {
     this.setState({ selectedItem })
+
+    //console.log(JSON.stringify(proj4))
+
+    /*   const parser = new WFS({
+      featureNS: 'http://mapserver.gis.umn.edu/mapserver',
+      version: '2.0.0'
+    });
+  
+      let layerData = undefined;
+      if(this.state.selectedItem !== undefined) {
+        if(this.state.selectedItem.type === 'node') {
+          const gmlURL = this.state.selectedItem.item.propertyList.find(p => p.key == 'gml:identifier')?.value || undefined;
+          if(gmlURL !== undefined) {
+              this.fetchFeaturesFromGmlURL(gmlURL).then(feature => this.setState({geoselection : feature}))
+            }
+          }
+  
+      layerData = undefined;
+      }
+      */
   }
 
   onGraphModelChange(stats: GraphStats): void {
@@ -277,6 +485,9 @@ export class GraphVisualizer extends Component<
           initialZoomToFit={this.props.initialZoomToFit}
           onGraphInteraction={this.props.onGraphInteraction}
         />
+
+        <MapParent zoomLevel={8} nodes={this.props.nodes} />
+
         <NodeInspectorPanel
           graphStyle={graphStyle}
           hasTruncatedFields={this.props.hasTruncatedFields}

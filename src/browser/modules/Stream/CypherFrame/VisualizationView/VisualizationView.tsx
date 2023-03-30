@@ -276,40 +276,42 @@ LIMIT ${maxNewNeighbours}`
 
     return (
       <StyledVisContainer isFullscreen={this.props.isFullscreen}>
-        <GraphVisualizer
-          maxNeighbours={this.props.maxNeighbours}
-          hasTruncatedFields={this.state.hasTruncatedFields}
-          graphStyleData={this.props.graphStyleData}
-          updateStyle={this.props.updateStyle}
-          getNeighbours={this.getNeighbours.bind(this)}
-          nodes={this.state.nodes}
-          autocompleteRelationships={this.props.autoComplete ?? false}
-          relationships={this.state.relationships}
-          isFullscreen={this.props.isFullscreen}
-          assignVisElement={this.props.assignVisElement}
-          nodeLimitHit={this.state.nodeLimitHit}
-          getAutoCompleteCallback={(
-            callback: (rels: BasicRelationship[], initialRun: boolean) => void
-          ) => {
-            this.autoCompleteCallback = callback
-          }}
-          setGraph={this.setGraph.bind(this)}
-          setNodePropertiesExpandedByDefault={
-            this.props.setNodePropertiesExpandedByDefault
-          }
-          nodePropertiesExpandedByDefault={
-            this.props.nodePropertiesExpandedByDefault
-          }
-          wheelZoomRequiresModKey={!this.props.isFullscreen}
-          wheelZoomInfoMessageEnabled={
-            this.props.wheelZoomInfoMessageEnabled && !this.props.isFullscreen
-          }
-          disableWheelZoomInfoMessage={this.props.disableWheelZoomInfoMessage}
-          DetailsPaneOverride={DetailsPane}
-          OverviewPaneOverride={OverviewPane}
-          useGeneratedDefaultColors={false}
-          initialZoomToFit
-        />
+        <div style={{ height: '50%' }}>
+          <GraphVisualizer
+            maxNeighbours={this.props.maxNeighbours}
+            hasTruncatedFields={this.state.hasTruncatedFields}
+            graphStyleData={this.props.graphStyleData}
+            updateStyle={this.props.updateStyle}
+            getNeighbours={this.getNeighbours.bind(this)}
+            nodes={this.state.nodes}
+            autocompleteRelationships={this.props.autoComplete ?? false}
+            relationships={this.state.relationships}
+            isFullscreen={this.props.isFullscreen}
+            assignVisElement={this.props.assignVisElement}
+            nodeLimitHit={this.state.nodeLimitHit}
+            getAutoCompleteCallback={(
+              callback: (rels: BasicRelationship[], initialRun: boolean) => void
+            ) => {
+              this.autoCompleteCallback = callback
+            }}
+            setGraph={this.setGraph.bind(this)}
+            setNodePropertiesExpandedByDefault={
+              this.props.setNodePropertiesExpandedByDefault
+            }
+            nodePropertiesExpandedByDefault={
+              this.props.nodePropertiesExpandedByDefault
+            }
+            wheelZoomRequiresModKey={!this.props.isFullscreen}
+            wheelZoomInfoMessageEnabled={
+              this.props.wheelZoomInfoMessageEnabled && !this.props.isFullscreen
+            }
+            disableWheelZoomInfoMessage={this.props.disableWheelZoomInfoMessage}
+            DetailsPaneOverride={DetailsPane}
+            OverviewPaneOverride={OverviewPane}
+            useGeneratedDefaultColors={false}
+            initialZoomToFit
+          />
+        </div>
       </StyledVisContainer>
     )
   }

@@ -130,7 +130,7 @@ export class Graph extends React.Component<GraphProps, GraphState> {
 
     const measureSize = () => ({
       width: this.svgElement.current?.parentElement?.clientWidth ?? 200,
-      height: this.svgElement.current?.parentElement?.clientHeight ?? 200
+      height: this.svgElement.current?.parentElement?.clientHeight ?? 500
     })
 
     const graph = createGraph(nodes, relationships)
