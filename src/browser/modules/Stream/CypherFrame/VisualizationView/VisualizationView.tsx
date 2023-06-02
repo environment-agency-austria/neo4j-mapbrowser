@@ -229,6 +229,49 @@ LIMIT ${maxNewNeighbours}`
     })
   }
 
+  updateQuery(queryString: string): Promise<BasicNodesAndRels> {
+    const query = queryString
+
+    return new Promise((resolve, reject) => {
+      this.props.bus &&
+        this.props.bus.self(
+          CYPHER_REQUEST,
+          { query: query, queryType: NEO4J_BROWSER_USER_ACTION_QUERY },
+          (response: any) => {
+            if (!response.success) {
+              reject(new Error())
+            } else {
+              /* const allNeighboursCount =
+                response.result.records.length > 0
+                  ? parseInt(
+                      response.result.records[0]
+                        .get('allNeighboursCount')
+                        .toString()
+                    )
+                  : 0 */
+              const resultGraph =
+                bolt.extractNodesAndRelationshipsFromRecordsForOldVis(
+                  response.result.records,
+                  false,
+                  this.props.maxFieldItems
+                )
+              /*    this.autoCompleteRelationships(
+                this.graph?.nodes() || [],
+                resultGraph.nodes,
+                false
+              ) */
+
+              // this.graph?.
+              //update({ updateNodes: true, updateRelationships: true })
+              //this.graphModelChanged()
+
+              resolve({ ...resultGraph })
+            }
+          }
+        )
+    })
+  }
+
   getInternalRelationships(
     rawExistingNodeIds: number[],
     rawNewNodeIds: number[]
@@ -283,6 +326,7 @@ LIMIT ${maxNewNeighbours}`
             graphStyleData={this.props.graphStyleData}
             updateStyle={this.props.updateStyle}
             getNeighbours={this.getNeighbours.bind(this)}
+            updateQuery={this.updateQuery.bind(this)}
             nodes={this.state.nodes}
             autocompleteRelationships={this.props.autoComplete ?? false}
             relationships={this.state.relationships}

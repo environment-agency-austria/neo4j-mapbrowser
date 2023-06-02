@@ -63,16 +63,18 @@ export class GraphModel {
   groupedRelationships(): NodePair[] {
     const groups: Record<string, NodePair> = {}
     for (const relationship of this._relationships) {
-      let nodePair = new NodePair(relationship.source, relationship.target)
+      if (relationship.source && relationship.target) {
+        let nodePair = new NodePair(relationship.source, relationship.target)
 
-      nodePair =
-        groups[nodePair.toString()] != null
-          ? groups[nodePair.toString()]
-          : nodePair
+        nodePair =
+          groups[nodePair.toString()] != null
+            ? groups[nodePair.toString()]
+            : nodePair
 
-      nodePair.relationships.push(relationship)
+        nodePair.relationships.push(relationship)
 
-      groups[nodePair.toString()] = nodePair
+        groups[nodePair.toString()] = nodePair
+      }
     }
 
     return Object.values(groups)

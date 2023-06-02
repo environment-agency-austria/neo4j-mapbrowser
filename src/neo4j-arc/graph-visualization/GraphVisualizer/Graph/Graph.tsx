@@ -69,6 +69,7 @@ export type GraphProps = {
     ) => void
   ) => void
   setGraph: (graph: GraphModel) => void
+  setGraphEventHandler: (eventHandler: GraphEventHandlerModel) => void
   offset: number
   wheelZoomRequiresModKey?: boolean
   wheelZoomInfoMessageEnabled?: boolean
@@ -88,6 +89,7 @@ export class Graph extends React.Component<GraphProps, GraphState> {
   wrapperElement: React.RefObject<HTMLDivElement>
   wrapperResizeObserver: ResizeObserver
   visualization: Visualization | null = null
+  graphEventHandler: GraphEventHandlerModel | null = null
 
   constructor(props: GraphProps) {
     super(props)
@@ -123,6 +125,7 @@ export class Graph extends React.Component<GraphProps, GraphState> {
       onItemSelect,
       relationships,
       setGraph,
+      setGraphEventHandler,
       wheelZoomRequiresModKey
     } = this.props
 
@@ -156,6 +159,11 @@ export class Graph extends React.Component<GraphProps, GraphState> {
       onGraphInteraction
     )
     graphEventHandler.bindEventHandlers()
+    this.graphEventHandler = graphEventHandler
+
+    if (setGraphEventHandler) {
+      setGraphEventHandler(graphEventHandler)
+    }
 
     onGraphModelChange(getGraphStats(graph))
     this.visualization.resize(isFullscreen, !!wheelZoomRequiresModKey)
