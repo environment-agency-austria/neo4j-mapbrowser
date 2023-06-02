@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 
 export type SyncPanelProps = {
   syncWithMapBounds: boolean
@@ -7,9 +7,34 @@ export type SyncPanelProps = {
     syncWithMapBound: boolean,
     syncWithGraph: boolean
   ) => void
+  layers: string[]
+  hiddenLayersChanged: (layers: string[]) => void
 }
 
 export function SyncPanel(props: SyncPanelProps) {
+  const [hiddenLayers, setHiddenLayers] = useState(new Set(props.layers))
+
+  const layers = props.layers.map(layerName => (
+    <label key={layerName} style={{ flexBasis: '100%' }}>
+      <input
+        type="checkbox"
+        checked={!hiddenLayers.has(layerName)}
+        onChange={value => {
+          const newSet = new Set(hiddenLayers)
+          if (!value.target.checked) {
+            newSet.add(layerName)
+          } else {
+            newSet.delete(layerName)
+          }
+          setHiddenLayers(newSet)
+
+          props.hiddenLayersChanged(props.layers.filter(l => newSet.has(l)))
+        }}
+      />
+      {layerName}
+    </label>
+  ))
+
   return (
     <div
       style={{
@@ -39,7 +64,8 @@ export function SyncPanel(props: SyncPanelProps) {
         />
         Sync Map with Nodes
       </label>
-      <button title="blabla">Alle Knoten in Map anzeigen</button>
+      Layers:
+      {layers}
     </div>
   )
 }

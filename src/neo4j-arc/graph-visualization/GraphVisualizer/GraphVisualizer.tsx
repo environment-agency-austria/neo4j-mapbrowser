@@ -64,7 +64,8 @@ import {
   useMapEvents,
   LayerGroup,
   LayerGroupProps,
-  WMSTileLayer
+  WMSTileLayer,
+  LayersControl
 } from 'react-leaflet'
 import { GeoJsonObject, FeatureCollection } from 'geojson'
 
@@ -157,6 +158,11 @@ function* coordEach(geojson: any): any {
 }
 
 const DEFAULT_MAX_NEIGHBOURS = 100
+
+type GeoNodeInfo = {
+  url: string
+  layers: string[]
+}
 
 type MapParentProps = {
   zoomLevel: number
@@ -332,7 +338,6 @@ function MapParent(props: MapParentProps) {
     features: []
   })
   const [shownURLs, setShownURLs] = useState(new Set<string>())
-  const [fetchCounter, setFetchCounter] = useState(0)
   const processedURLs = useRef(new Map<string, Feature | null>())
 
   //Filter selected objects based on their ID - depending on the currently selected item
@@ -372,8 +377,6 @@ function MapParent(props: MapParentProps) {
             // @ts-ignore
             processedURLs.current.set(res.url, res.geodata.features[0])
           })
-
-          setFetchCounter(fetchCounter + 1)
 
           //to: re-creation not required
           /*   const loadedFeatureCollections = f.map(res => fNotVoid.geodata) as FeatureCollection[]
@@ -488,7 +491,7 @@ function MapParent(props: MapParentProps) {
           onEachFeature={onEachFeature}
           pathOptions={{ color: 'red', weight: 5 }}
         />
-        {layer}
+        <LayersControl>{layer}</LayersControl>
         {/*<ZoomHandler onZoomChange={setZoomLevel} /> */}
         <BoundingBoxHandler
           onZoomChange={onMapZoomChange}
@@ -552,9 +555,11 @@ type GraphVisualizerState = {
   graphStyle: GraphStyleModel
   hoveredItem: VizItem
   nodes: BasicNode[]
-  nodeURLs: string[]
+  nodeURLs: GeoNodeInfo[]
   relationships: BasicRelationship[]
   mapGraph?: BasicNodesAndRels
+  hiddenLayers: string[]
+  loadedLayers: string[]
   selectedItem: VizItem
   stats: GraphStats
   styleVersion: number
@@ -639,7 +644,9 @@ export class GraphVisualizer extends Component<
       syncWithGraph: false,
       bounds: null,
       zoom: 8,
-      nodeURLs: []
+      nodeURLs: [],
+      hiddenLayers: [],
+      loadedLayers: []
     }
   }
 
@@ -811,14 +818,24 @@ export class GraphVisualizer extends Component<
     this.geh?.graphModelChanged()
   }
 
-  convertBasicNodesToURL(nodes: BasicNode[]) {
-    return Array.from(
-      new Set(
-        nodes
-          .filter(node => 'gml:identifier' in node.properties)
-          .map(node => node.properties['gml:identifier'])
-      )
-    )
+  convertBasicNodesToURL(nodes: BasicNode[]): GeoNodeInfo[] {
+    const containedURLs = new Set<string>()
+
+    return nodes
+      .filter(node => 'gml:identifier' in node.properties)
+      .filter(node => {
+        if (!containedURLs.has(node.properties['gml:identifier'])) {
+          containedURLs.add(node.properties['gml:identifier'])
+          return true
+        }
+        return false
+      })
+      .map(node => {
+        const url = node.properties['gml:identifier']
+        return { url: url, layers: node.labels }
+      })
+      .sort((n1, n2) => (n1.layers[0] > n2.layers[0] ? 1 : -1))
+    //.filter(node => node.labels.filter(l => selectedLayers.includes(l)).length > 0)
   }
 
   updateMapNodes = (zoom: number, zoomDetailLevel: number, bounds: any) => {
@@ -860,10 +877,16 @@ export class GraphVisualizer extends Component<
 
     console.log(query)
     this.props.updateQuery?.(query).then(resultGraph => {
+      const nodeInfo = this.convertBasicNodesToURL(resultGraph.nodes)
+      const loadedLayers = Array.from(
+        new Set(nodeInfo.flatMap(ni => ni.layers))
+      ).sort()
+
       this.setState({
         nodes: resultGraph.nodes,
         mapGraph: resultGraph,
-        nodeURLs: this.convertBasicNodesToURL(resultGraph.nodes)
+        nodeURLs: nodeInfo,
+        loadedLayers: loadedLayers
       })
 
       console.log('number of nodes returned: ' + resultGraph.nodes.length)
@@ -903,8 +926,9 @@ export class GraphVisualizer extends Component<
 
       const urlList = this.g
         ?.nodes()
-        .map(n => n.propertyMap['gml:identifier'])
-        .filter(url => url)
+        .filter(n => n.propertyMap['gml:identifier'])
+        .map(n => ({ url: n.propertyMap['gml:identifier'], layers: n.labels }))
+
       if (JSON.stringify(urlList) !== JSON.stringify(this.state.nodeURLs)) {
         this.setState({ nodeURLs: urlList })
       }
@@ -926,6 +950,10 @@ export class GraphVisualizer extends Component<
     }
   }
 
+  hiddenLayersChanged = (layers: string[]) => {
+    this.setState({ hiddenLayers: layers })
+  }
+
   render(): JSX.Element {
     // This is a workaround to make the style reset to the same colors as when starting the browser with an empty style
     // If the legend component has the style it will ask the neoGraphStyle object for styling before the graph component,
@@ -938,7 +966,7 @@ export class GraphVisualizer extends Component<
       this.syncMapWithGraph()
     }
 
-    const nodeURLs = this.convertBasicNodesToURL(this.state.nodes)
+    //const nodeURLs = this.convertBasicNodesToURL(this.state.nodes)
 
     return (
       <StyledFullSizeContainer id="svg-vis">
@@ -947,6 +975,8 @@ export class GraphVisualizer extends Component<
             syncWithMapBounds={this.state.syncWithMap}
             syncWithGraph={this.state.syncWithGraph}
             syncOptionsChanged={this.syncOptionsChanged}
+            layers={this.state.loadedLayers}
+            hiddenLayersChanged={this.hiddenLayersChanged}
           />
         </div>
 
@@ -980,7 +1010,11 @@ export class GraphVisualizer extends Component<
           zoomLevel={8}
           graph={this.g}
           geh={this.geh}
-          nodeURLs={this.state.nodeURLs}
+          nodeURLs={
+            this.state.nodeURLs
+              .filter(n => !this.state.hiddenLayers.includes(n.layers[0]))
+              .map(n => n.url) /*TODO: only checks for first layer*/
+          }
           updateMapNodes={this.updateMapNodes}
         />
 
