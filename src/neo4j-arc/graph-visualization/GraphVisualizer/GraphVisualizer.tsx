@@ -26,7 +26,8 @@ import React, {
   FC,
   useMemo,
   useEffect,
-  useRef
+  useRef,
+  useReducer
 } from 'react'
 
 import { Graph } from './Graph/Graph'
@@ -172,6 +173,8 @@ type MapParentProps = {
   geh?: GraphEventHandlerModel
   updateMapNodes(zoom: number, zoomDetailLevel: number, bounds: any): void
   position: [number, number]
+  syncWithMap: boolean
+  syncWithGraph: boolean
 }
 
 type MapParentState = {
@@ -339,6 +342,7 @@ function MapParent(props: MapParentProps) {
   })
   const [shownURLs, setShownURLs] = useState(new Set<string>())
   const processedURLs = useRef(new Map<string, Feature | null>())
+  const [ignored, forceUpdate] = useReducer(x => x + 1, 0)
 
   //Filter selected objects based on their ID - depending on the currently selected item
   const selectedGeoData = {
@@ -377,6 +381,7 @@ function MapParent(props: MapParentProps) {
             // @ts-ignore
             processedURLs.current.set(res.url, res.geodata.features[0])
           })
+          forceUpdate()
 
           //to: re-creation not required
           /*   const loadedFeatureCollections = f.map(res => fNotVoid.geodata) as FeatureCollection[]
@@ -430,7 +435,7 @@ function MapParent(props: MapParentProps) {
   const detailZoomLevel = 11
 
   let layer
-  if (zoomLevel >= detailZoomLevel) {
+  if (zoomLevel >= detailZoomLevel || props.syncWithGraph) {
     layer = (
       <GeoJSON
         key={Math.random()}
@@ -440,7 +445,7 @@ function MapParent(props: MapParentProps) {
         pathOptions={{ color: 'blue', weight: 1 }}
       />
     )
-  } else {
+  } else if (props.syncWithMap) {
     layer = (
       <WMSTileLayer
         url="http://swwat.grillmayer.eu:8080/geoserver/ows?SERVICE=WMS&"
@@ -456,7 +461,7 @@ function MapParent(props: MapParentProps) {
   console.log(JSON.stringify(props.position))
 
   useEffect(() => {
-    if (zoomLevel < detailZoomLevel) {
+    if (zoomLevel < detailZoomLevel && !props.syncWithGraph) {
       return
     }
 
@@ -832,6 +837,7 @@ export class GraphVisualizer extends Component<
       })
       .map(node => {
         const url = node.properties['gml:identifier']
+        const kurzbesch = node.properties['gml:']
         return { url: url, layers: node.labels }
       })
       .sort((n1, n2) => (n1.layers[0] > n2.layers[0] ? 1 : -1))
@@ -1012,10 +1018,12 @@ export class GraphVisualizer extends Component<
           geh={this.geh}
           nodeURLs={
             this.state.nodeURLs
-              .filter(n => !this.state.hiddenLayers.includes(n.layers[0]))
+              .filter(n => !this.state.hiddenLayers.includes(n.layers[0])) // || this.state.syncWithGraph) //TODO: Hack to avoid unknown layer bug
               .map(n => n.url) /*TODO: only checks for first layer*/
           }
           updateMapNodes={this.updateMapNodes}
+          syncWithMap={this.state.syncWithMap}
+          syncWithGraph={this.state.syncWithGraph}
         />
 
         <NodeInspectorPanel
