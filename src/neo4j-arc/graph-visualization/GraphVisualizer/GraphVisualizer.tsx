@@ -72,7 +72,6 @@ import { GeoJsonObject, FeatureCollection } from 'geojson'
 
 import { WFS, GML } from 'ol/format'
 import GML32 from 'ol/format/GML32'
-import * as olProj from 'ol/proj'
 import { GeoJSON as OLGeoJson } from 'ol/format'
 import { LineString, Point } from 'ol/geom'
 
@@ -83,430 +82,16 @@ import { Feature } from 'ol'
 import { SyncPanel } from './SyncPanel'
 const proj4 = (proj4x as any).default
 
-/**
- * @description Create input GeoJSON bounding box.
- * @param {GeoJSON} geojson Input GeoJSON.
- * @return {Array} GeoJSON bounding box.
- */
-function computeBoundingBox(geojson: any): any {
-  const bbox = [
-    Number.POSITIVE_INFINITY,
-    Number.POSITIVE_INFINITY,
-    Number.POSITIVE_INFINITY,
-    Number.NEGATIVE_INFINITY,
-    Number.NEGATIVE_INFINITY,
-    Number.NEGATIVE_INFINITY
-  ]
+import { MapParent } from '../MapVisualizer/MapParent'
+import { convertBasicNodesToGeoNodeInfo } from '../MapVisualizer/graph_to_map'
 
-  // Update bbox with each coordinate
-  let dimensions = 2
-  for (const coordinate of coordEach(geojson)) {
-    dimensions = Math.max(dimensions, coordinate.length)
-    for (let i = 0; i < coordinate.length; ++i) {
-      const j = 3 + i
-      bbox[i] = Math.min(bbox[i], coordinate[i])
-      bbox[j] = Math.max(bbox[j], coordinate[i])
-    }
-  }
-
-  // Remove 3rd dimension if not present in data.
-  if (dimensions !== 3) {
-    return [bbox[0], bbox[1], bbox[3], bbox[4]]
-  }
-  return bbox
-}
-
-/**
- * @description Generator that yields each GeoJSON coordinate.
- * @param {GeoJSON} geojson Input GeoJSON.
- * @yields [Array] GeoJSON 2D or 3D coordinate.
- */
-function* coordEach(geojson: any): any {
-  switch (geojson.type) {
-    case 'Point':
-      yield geojson.coordinates
-      break
-    case 'LineString':
-    case 'MultiPoint':
-      yield* geojson.coordinates
-      break
-    case 'Polygon':
-    case 'MultiLineString':
-      for (const part of geojson.coordinates) {
-        yield* part
-      }
-      break
-    case 'MultiPolygon':
-      for (const polygon of geojson.coordinates) {
-        for (const ring of polygon) {
-          yield* ring
-        }
-      }
-      break
-    case 'GeometryCollection':
-      for (const geometry of geojson.geometries) {
-        yield* coordEach(geometry)
-      }
-      break
-    case 'FeatureCollection':
-      for (const feature of geojson.features) {
-        yield* coordEach(feature)
-      }
-      break
-    default:
-      yield* coordEach(geojson.geometry)
-  }
-}
+import { GeoNodeInfo } from '../MapVisualizer/types'
+import {
+  generateNodeBoundsQuery,
+  setGraphNodes
+} from '../MapVisualizer/map_to_graph'
 
 const DEFAULT_MAX_NEIGHBOURS = 100
-
-type GeoNodeInfo = {
-  url: string
-  layers: string[]
-}
-
-type MapParentProps = {
-  zoomLevel: number
-  //mapNodes: BasicNode[]
-  nodeURLs: string[]
-  graph?: GraphModel
-  geh?: GraphEventHandlerModel
-  updateMapNodes(zoom: number, zoomDetailLevel: number, bounds: any): void
-  position: [number, number]
-  syncWithMap: boolean
-  syncWithGraph: boolean
-}
-
-type MapParentState = {
-  geodata: GeoJsonObject
-  geoselection: GeoJsonObject
-  zoomLevel: number
-}
-
-type ZoomChangeProps = {
-  onZoomChange: Function
-}
-
-function ZoomHandler(props: ZoomChangeProps) {
-  const [zoomLevel, setZoomLevel] = useState(8)
-
-  const mapEvents = useMapEvents({
-    zoomend: () => {
-      setZoomLevel(mapEvents.getZoom())
-      props.onZoomChange(mapEvents.getZoom())
-    }
-  })
-
-  return null
-}
-
-type BoundingBoxChangeProps = {
-  //updateQuery?: (query: string) => Promise<BasicNodesAndRels>
-  //graph?: GraphModel
-  //updateNodes : (graph : BasicNodesAndRels) => any
-  //zoomLevel : number
-  //detailZoomStart : number,
-  //zoomState : { zoomLevel: number, setZoomLevel : React.Dispatch<React.SetStateAction<number>>}
-  onBoundsChanged: (bounds: any) => void
-  onZoomChange: (zoom: number) => void
-}
-
-// Todo: move sync function out, so it can be also called by button click
-function BoundingBoxHandler(props: BoundingBoxChangeProps) {
-  const mapEvents = useMapEvents({
-    zoomend: (e: any) => {
-      console.log(e)
-      //props.zoomState.setZoomLevel(mapEvents.getZoom())
-      props.onZoomChange(mapEvents.getZoom())
-    },
-    moveend: () => {
-      props.onBoundsChanged(mapEvents.getBounds())
-    }
-  })
-
-  return null
-}
-
-async function fetchFeaturesFromGmlURL(
-  gmlURL: string
-): Promise<{ geodata: FeatureCollection; url: string }> {
-  const parser = new WFS({
-    featureNS: 'http://mapserver.gis.umn.edu/mapserver',
-    version: '2.0.0'
-  })
-
-  return fetch(gmlURL)
-    .then(response => response.text())
-    .then(data => {
-      data = data.replace('.swwat.', '.swaat.')
-      const wfsFeatures = parser.readFeatures(data)
-      const gmlString = new GML32({
-        srsName: 'urn:ogc:def:crs:EPSG::4326',
-        featureNS: 'swaat'
-      }).writeFeatures(wfsFeatures)
-
-      const gjs1 = JSON.parse(
-        new OLGeoJson().writeFeatures(wfsFeatures, {
-          featureProjection: 'EPSG:4326',
-          dataProjection: 'EPSG:4326'
-        })
-      )
-
-      try {
-        const bBox = computeBoundingBox(gjs1)
-        //.replace("swwat", "swaat")
-        console.log(
-          'MATCH(n {`gml:id` : "' +
-            gjs1.features[0].id +
-            '"}) SET n += { x1: ' +
-            bBox[0] +
-            ', x2: ' +
-            bBox[3] +
-            ',y1: ' +
-            bBox[1] +
-            ', y2: ' +
-            bBox[4] +
-            ' }'
-        )
-      } catch (e) {}
-
-      const gjs = JSON.parse(
-        new OLGeoJson().writeFeatures(wfsFeatures, {
-          featureProjection: 'EPSG:31287',
-          dataProjection: 'EPSG:4326'
-        })
-      ) as FeatureCollection
-
-      return { geodata: gjs, url: gmlURL }
-    })
-}
-
-function ViewComp(props: { center: number[] }) {
-  const map = useMap()
-
-  useEffect(() => {
-    if (
-      Math.round(map.getCenter().lat * 100) / 100 !==
-      Math.round(props.center[0] * 100) / 100
-    ) {
-      //console.log(JSON.stringify({lat: props.center[0], lng: props.center[1]})+"; " + JSON.stringify(map.getCenter()))
-      //map.setView({lat: props.center[0], lng: props.center[1]});
-    }
-  }, [props.center, map])
-
-  return null
-}
-
-function MapParent(props: MapParentProps) {
-  // run only once, because no dependencies
-  useEffect(() => {
-    proj4.defs(
-      'EPSG:31287',
-      '+proj=lcc +axis=neu +lat_0=47.5 +lon_0=13.3333333333333 +lat_1=49 +lat_2=46 +x_0=400000 +y_0=400000 +ellps=bessel +towgs84=577.326,90.129,463.919,5.137,1.474,5.297,2.42319999999019 +units=m +no_defs +type=crs'
-    )
-    register(proj4)
-  }, [])
-
-  const [selectedItem, setSelectedItem] = useState(props.geh?.selectedItem)
-  if (selectedItem !== props.geh?.selectedItem) {
-    setSelectedItem(props.geh?.selectedItem)
-  }
-
-  // Handle click on Layer
-  const onEachFeature = (feature: any, layer: any) => {
-    layer.on('click', () => {
-      //typo in gmlid
-      const gmlId = feature.id //.replace('swwat', 'swaat');
-
-      if (props.graph && props.geh) {
-        const selectedNode = props.graph
-          .nodes()
-          .find(n =>
-            n.propertyList.find(p => p.key === 'gml:id' && p.value === gmlId)
-          )
-        if (selectedNode) {
-          props.geh.selectItem(selectedNode)
-          setSelectedItem(selectedNode)
-        }
-      }
-
-      return null
-    })
-  }
-
-  const [zoomLevel, setZoomLevel] = useState(8)
-  const [bounds, setBounds] = useState<any>()
-  const [_geodata, setGeoData] = useState<FeatureCollection>({
-    type: 'FeatureCollection',
-    features: []
-  })
-  const [shownURLs, setShownURLs] = useState(new Set<string>())
-  const processedURLs = useRef(new Map<string, Feature | null>())
-  const [ignored, forceUpdate] = useReducer(x => x + 1, 0)
-
-  //Filter selected objects based on their ID - depending on the currently selected item
-  const selectedGeoData = {
-    type: 'FeatureCollection',
-    features: []
-  } as FeatureCollection
-  if (selectedItem) {
-    const selId = selectedItem.propertyList.find(p => p.key === 'gml:id')?.value
-    //TODO swaat, swwat ("" + f.id).replace('swwat', 'swaat')
-    selectedGeoData.features = _geodata.features.filter(f => f.id === selId)
-  }
-
-  const updateMapData = (nodesURLs: string[]) => {
-    const gmlURLs = nodesURLs
-
-    // fetch only urls which have not been fetched before
-    let unfetchedURLs = gmlURLs.filter(url => !processedURLs.current.has(url))
-    if (unfetchedURLs.length > 0) {
-      unfetchedURLs = [...new Set(unfetchedURLs)]
-      unfetchedURLs.forEach(url => processedURLs.current.set(url, null))
-      //processedURLs.current = processedURLs.current;
-      //is this needed at all?
-      //setProcessedURLs(processedURLs.current);
-
-      const pendingFetches = unfetchedURLs.map(gmlURL => {
-        console.log('start fetching of: ' + gmlURL)
-        return fetchFeaturesFromGmlURL(gmlURL).catch(e =>
-          console.log('Error fetching url: ' + gmlURL + ' ' + e)
-        )
-      })
-
-      Promise.all(pendingFetches).then(f => {
-        try {
-          const fNotVoid = f as { geodata: FeatureCollection; url: string }[]
-          fNotVoid.forEach(res => {
-            // @ts-ignore
-            processedURLs.current.set(res.url, res.geodata.features[0])
-          })
-          forceUpdate()
-
-          //to: re-creation not required
-          /*   const loadedFeatureCollections = f.map(res => fNotVoid.geodata) as FeatureCollection[]
-          const loadedURLs = f.map(res => fNotVoid.url);
-          const featureCollection: FeatureCollection = {
-            type: 'FeatureCollection',
-            features: []
-          }
-          featureCollection.features = _geodata.features.concat(loadedFeatureCollections.map(col => col.features[0])) //TODO
-          loadedFeatureCollections.forEach(lfc =>
-            featureCollection.features.push(lfc.features[0])
-          )
-          */
-        } catch (e) {
-          console.log(e)
-        }
-      })
-    }
-  }
-
-  function assembleFeatureCollection(): {
-    collection: FeatureCollection
-    shownURLs: Set<string>
-  } {
-    const featureCollection: FeatureCollection = {
-      type: 'FeatureCollection',
-      features: []
-    }
-
-    const urls = new Set<string>()
-    props.nodeURLs.forEach(url => {
-      const feature = processedURLs.current.get(url)
-      if (feature && feature != null) {
-        // @ts-ignore
-        featureCollection.features.push(feature)
-        urls.add(url)
-      }
-    })
-
-    return { collection: featureCollection, shownURLs: urls }
-  }
-
-  const dataToShow = assembleFeatureCollection()
-  const newURLs = JSON.stringify(Array.from(dataToShow.shownURLs))
-  const oldURLs = JSON.stringify(Array.from(shownURLs))
-  if (newURLs !== oldURLs) {
-    setShownURLs(dataToShow.shownURLs)
-    setGeoData(dataToShow.collection)
-  }
-
-  const detailZoomLevel = 11
-
-  let layer
-  if (zoomLevel >= detailZoomLevel || props.syncWithGraph) {
-    layer = (
-      <GeoJSON
-        key={Math.random()}
-        data={_geodata}
-        // @ts-expect-error
-        onEachFeature={onEachFeature}
-        pathOptions={{ color: 'blue', weight: 1 }}
-      />
-    )
-  } else if (props.syncWithMap) {
-    layer = (
-      <WMSTileLayer
-        url="http://swwat.grillmayer.eu:8080/geoserver/ows?SERVICE=WMS&"
-        params={{
-          layers: 'swwat:GefahrenzonenPublic',
-          transparent: true,
-          format: 'image/png'
-        }}
-      />
-    )
-  }
-
-  console.log(JSON.stringify(props.position))
-
-  useEffect(() => {
-    if (zoomLevel < detailZoomLevel && !props.syncWithGraph) {
-      return
-    }
-
-    updateMapData(props.nodeURLs)
-  })
-
-  const onMapZoomChange = (zoom: number) => {
-    setZoomLevel(zoom)
-    props.updateMapNodes(zoomLevel, detailZoomLevel, bounds)
-  }
-
-  const onMapBoundsChange = (bounds: any) => {
-    setBounds(bounds)
-    props.updateMapNodes(zoomLevel, detailZoomLevel, bounds)
-  }
-
-  return (
-    <div style={{ width: '100%', height: '100%' }}>
-      {/*zoomLevel*/}
-      {zoomLevel}
-      <MapContainer
-        style={{ width: '100%', height: '100%', zIndex: 1 }}
-        center={props.position}
-        zoom={zoomLevel}
-        scrollWheelZoom={true}
-      >
-        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-        <GeoJSON
-          key={Math.random()}
-          data={selectedGeoData}
-          // @ts-expect-error
-          onEachFeature={onEachFeature}
-          pathOptions={{ color: 'red', weight: 5 }}
-        />
-        <LayersControl>{layer}</LayersControl>
-        {/*<ZoomHandler onZoomChange={setZoomLevel} /> */}
-        <BoundingBoxHandler
-          onZoomChange={onMapZoomChange}
-          onBoundsChanged={onMapBoundsChange}
-        />
-        {/*<ViewComp center={props.position} />*/}
-      </MapContainer>
-    </div>
-  )
-}
 
 type GraphVisualizerDefaultProps = {
   maxNeighbours: number
@@ -560,17 +145,18 @@ type GraphVisualizerState = {
   graphStyle: GraphStyleModel
   hoveredItem: VizItem
   nodes: BasicNode[]
-  nodeURLs: GeoNodeInfo[]
   relationships: BasicRelationship[]
-  mapGraph?: BasicNodesAndRels
-  hiddenLayers: string[]
-  loadedLayers: string[]
   selectedItem: VizItem
   stats: GraphStats
   styleVersion: number
   freezeLegend: boolean
   width: number
   nodePropertiesExpanded: boolean
+  /* map related additions */
+  nodeURLs: GeoNodeInfo[]
+  mapGraph?: BasicNodesAndRels
+  hiddenLayers: string[]
+  loadedLayers: string[]
   mapPosition: number[]
   syncWithMap: boolean
   syncWithGraph: boolean
@@ -696,53 +282,6 @@ export class GraphVisualizer extends Component<
 
   onItemSelect(selectedItem: VizItem): void {
     this.setState({ selectedItem })
-
-    // eventuell in main - re-render will happen anyway
-    if (this.state.selectedItem.type === 'node') {
-      const x1 = parseFloat(
-        this.state.selectedItem.item.propertyList.find(p => p.key == 'x1')
-          ?.value || '0'
-      )
-      const y1 = parseFloat(
-        this.state.selectedItem.item.propertyList.find(p => p.key == 'y1')
-          ?.value || '0'
-      )
-      const x2 = parseFloat(
-        this.state.selectedItem.item.propertyList.find(p => p.key == 'x2')
-          ?.value || '0'
-      )
-      const y2 = parseFloat(
-        this.state.selectedItem.item.propertyList.find(p => p.key == 'y2')
-          ?.value || '0'
-      )
-
-      if (x1 > 0) {
-        const top = olProj.toLonLat([x1, y1], 'EPSG:31287')
-        //const bottom = olProj.toLonLat([x2, y2], 'EPSG:4326');
-        console.log(JSON.stringify(top))
-        this.setState({ mapPosition: [top[1], top[0]] })
-      }
-    }
-
-    //console.log(JSON.stringify(proj4))
-
-    /*   const parser = new WFS({
-      featureNS: 'http://mapserver.gis.umn.edu/mapserver',
-      version: '2.0.0'
-    });
-  
-      let layerData = undefined;
-      if(this.state.selectedItem !== undefined) {
-        if(this.state.selectedItem.type === 'node') {
-          const gmlURL = this.state.selectedItem.item.propertyList.find(p => p.key == 'gml:identifier')?.value || undefined;
-          if(gmlURL !== undefined) {
-              this.fetchFeaturesFromGmlURL(gmlURL).then(feature => this.setState({geoselection : feature}))
-            }
-          }
-  
-      layerData = undefined;
-      }
-      */
   }
 
   onGraphModelChange(stats: GraphStats): void {
@@ -779,111 +318,48 @@ export class GraphVisualizer extends Component<
 
   geh?: GraphEventHandlerModel
   g?: GraphModel
-  setGraph(g: GraphModel) {
+
+  setGraph = (g: GraphModel) => {
     this.props.setGraph(g)
     this.g = g
   }
 
-  syncGraphWithMapNodes(n: BasicNodesAndRels) {
-    const newNodeIDs = new Set(n.nodes.map(n => n.id))
-    const existingNodeIDS = new Set(this.g?.nodes().map(n => n.id))
-
-    //const nodesToBeRemoved = this.g?.nodes().filter(n => !newNodeIDs.has(n.id));
-    //const nodesBeforeRemoval = this.g?.nodes().length;
-
-    //while(nodesToBeRemoved.)
-    {
-      //remove all current nodes not contained in the new node-list
-      this.g
-        ?.nodes()
-        .filter(n => !newNodeIDs.has(n.id))
-        .forEach(n => {
-          this.g?.removeConnectedRelationships(n)
-          this.g?.removeNode(n)
-        })
-    }
-    console.log('nodes survived: ' + this.g?.nodes().length)
-
-    const createNodes = n.nodes.filter(n => !existingNodeIDS.has(n.id))
-
-    const nodeModel = mapNodes(createNodes)
-    this.g?.addNodes(nodeModel)
-
-    if (this.g) {
-      //TODO: Filter relationships
-      const relModel = mapRelationships(n.relationships, this.g)
-      this.g?.addRelationships(relModel)
-    }
-
-    this.geh?.visualization.update({
-      updateNodes: true,
-      updateRelationships: true,
-      restartSimulation: true
-    })
-    this.geh?.graphModelChanged()
+  setGraphEventHandlerModel = (handler: GraphEventHandlerModel) => {
+    this.geh = handler
   }
 
-  convertBasicNodesToURL(nodes: BasicNode[]): GeoNodeInfo[] {
-    const containedURLs = new Set<string>()
+  syncOptionsChanged = (syncWithMapBound: boolean, syncWithGraph: boolean) => {
+    if (syncWithMapBound && this.state.mapGraph) {
+      //restore graph based on what was fetched for map before
+      setGraphNodes(this.state.mapGraph, this.g, this.geh)
+    }
 
-    return nodes
-      .filter(node => 'gml:identifier' in node.properties)
-      .filter(node => {
-        if (!containedURLs.has(node.properties['gml:identifier'])) {
-          containedURLs.add(node.properties['gml:identifier'])
-          return true
-        }
-        return false
-      })
-      .map(node => {
-        const url = node.properties['gml:identifier']
-        const kurzbesch = node.properties['gml:']
-        return { url: url, layers: node.labels }
-      })
-      .sort((n1, n2) => (n1.layers[0] > n2.layers[0] ? 1 : -1))
-    //.filter(node => node.labels.filter(l => selectedLayers.includes(l)).length > 0)
+    if (syncWithGraph) {
+      this.syncMapWithGraph()
+    }
+
+    this.setState(prev => ({
+      ...prev,
+      syncWithMap: syncWithMapBound,
+      syncWithGraph: syncWithGraph
+    }))
   }
 
-  updateMapNodes = (zoom: number, zoomDetailLevel: number, bounds: any) => {
+  syncGraphWithMap = (zoom: number, zoomDetailLevel: number, bounds: any) => {
     if (!this.state.syncWithMap) {
       return
     }
 
     // wenn grob, keine Daten laden (nur für getFeatureInfo)
     if (zoom < zoomDetailLevel) {
-      this.syncGraphWithMapNodes({ nodes: [], relationships: [] })
+      setGraphNodes({ nodes: [], relationships: [] }, this.g, this.geh)
       return
     }
 
-    // je nach zoomstufe
-    //console.log("moved: " + JSON.stringify())
-
-    const southWestTrx = olProj.fromLonLat(
-      [bounds._southWest.lng, bounds._southWest.lat],
-      'EPSG:31287'
-    )
-    const northEastTrx = olProj.fromLonLat(
-      [bounds._northEast.lng, bounds._northEast.lat],
-      'EPSG:31287'
-    )
-
-    //console.log(JSON.stringify(northWest) + " - " + JSON.stringify(southEast));
-    //+ " AND n.y1 <= " + northEastTrx[1]
-    //+" AND n.x2 <= " + southWestTrx[0]  +
-    const query =
-      'MATCH(n) WHERE n.x1 <= ' +
-      northEastTrx[0] +
-      ' AND n.x2 >= ' +
-      southWestTrx[0] +
-      ' AND n.y1 <= ' +
-      northEastTrx[1] +
-      ' AND n.y2 >= ' +
-      southWestTrx[1] +
-      ' MATCH path = (n)--() return path;'
-
+    const query = generateNodeBoundsQuery(bounds)
     console.log(query)
     this.props.updateQuery?.(query).then(resultGraph => {
-      const nodeInfo = this.convertBasicNodesToURL(resultGraph.nodes)
+      const nodeInfo = convertBasicNodesToGeoNodeInfo(resultGraph.nodes)
       const loadedLayers = Array.from(
         new Set(nodeInfo.flatMap(ni => ni.layers))
       ).sort()
@@ -897,33 +373,9 @@ export class GraphVisualizer extends Component<
 
       console.log('number of nodes returned: ' + resultGraph.nodes.length)
       if (this.state.syncWithMap) {
-        this.syncGraphWithMapNodes(resultGraph)
+        setGraphNodes(resultGraph, this.g, this.geh)
       }
     })
-  }
-
-  setGraphEventHandlerModel(handler: GraphEventHandlerModel) {
-    this.geh = handler
-  }
-
-  syncOptionsChanged = (
-    syncWithMapBound: boolean,
-    syncWithGraph: boolean
-  ): void => {
-    if (syncWithMapBound && this.state.mapGraph) {
-      //restore graph based on what was fetched for map before
-      this.syncGraphWithMapNodes(this.state.mapGraph)
-    }
-
-    if (syncWithGraph) {
-      this.syncMapWithGraph()
-    }
-
-    this.setState(prev => ({
-      ...prev,
-      syncWithMap: syncWithMapBound,
-      syncWithGraph: syncWithGraph
-    }))
   }
 
   syncMapWithGraph = () => {
@@ -938,21 +390,6 @@ export class GraphVisualizer extends Component<
       if (JSON.stringify(urlList) !== JSON.stringify(this.state.nodeURLs)) {
         this.setState({ nodeURLs: urlList })
       }
-      /*
- id: string
-  labels: string[]
-  properties: Record<string, string>
-  propertyTypes: Record<string, string>
-*/
-
-      /*
-  id: string
-  labels: string[]
-  propertyList: VizItemProperty[]
-  propertyMap: NodeProperties
-  isNode = true
-  isRelationship = false
-  */
     }
   }
 
@@ -990,7 +427,7 @@ export class GraphVisualizer extends Component<
           isFullscreen={this.props.isFullscreen}
           relationships={this.state.relationships}
           nodes={this.state.nodes}
-          getNodeNeighbours={this.getNodeNeighbours.bind(this)}
+          getNodeNeighbours={this.getNodeNeighbours}
           onItemMouseOver={this.onItemMouseOver.bind(this)}
           onItemSelect={this.onItemSelect.bind(this)}
           graphStyle={graphStyle}
@@ -1021,9 +458,10 @@ export class GraphVisualizer extends Component<
               .filter(n => !this.state.hiddenLayers.includes(n.layers[0])) // || this.state.syncWithGraph) //TODO: Hack to avoid unknown layer bug
               .map(n => n.url) /*TODO: only checks for first layer*/
           }
-          updateMapNodes={this.updateMapNodes}
+          syncGraphWithMap={this.syncGraphWithMap}
           syncWithMap={this.state.syncWithMap}
           syncWithGraph={this.state.syncWithGraph}
+          selectedItem={this.state.selectedItem}
         />
 
         <NodeInspectorPanel
