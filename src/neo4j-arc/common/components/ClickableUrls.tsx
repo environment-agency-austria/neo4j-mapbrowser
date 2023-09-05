@@ -17,7 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-import React from 'react'
+import React, { useState } from 'react'
 
 // credits to https://www.regextester.com/96504, modified though
 const URL_REGEX =
@@ -26,11 +26,13 @@ const URL_REGEX =
 interface ClickableUrlsProps {
   text?: string | null
   WrappingTag?: keyof JSX.IntrinsicElements | React.ElementType
+  edit?: boolean
 }
 
 export function ClickableUrls({
   text,
-  WrappingTag = 'span'
+  WrappingTag = 'span',
+  edit = false
 }: ClickableUrlsProps): JSX.Element {
   const definedText = text || ''
   const urls = definedText.match(URL_REGEX) || []
@@ -40,11 +42,15 @@ export function ClickableUrls({
         /* since we never move these components this key should be fine */
         return (
           <React.Fragment key={index}>
-            {text}
-            {urls[index] && (
-              <a href={urls[index]} target="_blank" rel="noreferrer">
-                {urls[index]}
-              </a>
+            {!edit && (
+              <div>
+                {text}
+                {urls[index] && (
+                  <a href={urls[index]} target="_blank" rel="noreferrer">
+                    {urls[index]}
+                  </a>
+                )}
+              </div>
             )}
           </React.Fragment>
         )

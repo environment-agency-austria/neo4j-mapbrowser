@@ -130,6 +130,10 @@ module.exports = [
     use: ['html-loader']
   },
   {
+    test: /\.png?$/,
+    use: ['file-loader']
+  },
+  {
     test: /boltWorker\.ts/,
     use: [
       {

@@ -73,6 +73,13 @@ export const CopyCell = styled.td`
   display: flex;
   justify-content: flex-end;
 `
+
+export const EditCell = styled.td`
+  padding: 2px 5px;
+  display: flex;
+  justify-content: flex-end;
+`
+
 export const ValueCell = styled.td`
   padding: 2px;
   white-space: pre-wrap;

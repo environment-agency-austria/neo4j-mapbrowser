@@ -2775,6 +2775,13 @@
   dependencies:
     "@types/react" "*"
 
+"@types/react-transition-group@^4.4.1":
+  version "4.4.6"
+  resolved "https://registry.yarnpkg.com/@types/react-transition-group/-/react-transition-group-4.4.6.tgz#18187bcda5281f8e10dfc48f0943e2fdf4f75e2e"
+  integrity sha512-VnCdSxfcm08KjsJVQcfBmhEQAPnLB8G08hAxn39azX1qYBQ/5RVQuoHuKIcfKOdncuaUvEpFKFzEvbtIMsfVew==
+  dependencies:
+    "@types/react" "*"
+
 "@types/react@*":
   version "17.0.2"
   resolved "https://registry.yarnpkg.com/@types/react/-/react-17.0.2.tgz#3de24c4efef902dd9795a49c75f760cbe4f7a5a8"
@@ -12070,6 +12077,14 @@ pretty-format@^27.0.2:
     ansi-styles "^5.0.0"
     react-is "^17.0.1"
 
+primereact@^9.6.2:
+  version "9.6.2"
+  resolved "https://registry.yarnpkg.com/primereact/-/primereact-9.6.2.tgz#266053294bcbbc24340948a8b82f969ebbb02bdb"
+  integrity sha512-wc7bvhR+9TiWkHADp02R10lnLbtmXiJ0Pdix8jgVh9HdHMaT2tbA6zPuhaRvA1PVT49hvrDXRCL9QB6YtaCi3w==
+  dependencies:
+    "@types/react-transition-group" "^4.4.1"
+    react-transition-group "^4.4.1"
+
 prismjs@^1.27.0:
   version "1.29.0"
   resolved "https://registry.yarnpkg.com/prismjs/-/prismjs-1.29.0.tgz#f113555a8fa9b57c35e637bba27509dcf802dd12"
@@ -12451,7 +12466,7 @@ react-is@^16.12.0, react-is@^16.13.1, react-is@^16.6.0, react-is@^16.6.3, react-
 "react-leaflet@file:../react-leaflet/packages/react-leaflet":
   version "3.2.5"
   dependencies:
-    "@react-leaflet/core" "file:../../Users/eisserer/AppData/Local/Yarn/Cache/v6/npm-react-leaflet-3.2.5-dee10799-201c-4b5b-9544-64cdd14dc9f7-1680158888976/node_modules/core"
+    "@react-leaflet/core" "file:../../Users/eisserer/AppData/Local/Yarn/Cache/v6/npm-react-leaflet-3.2.5-f6e202b9-6e67-4550-88f7-b6cd7efd2c32-1693222506209/node_modules/core"
 
 react-lifecycles-compat@^3.0.0, react-lifecycles-compat@^3.0.4:
   version "3.0.4"
@@ -12580,7 +12595,7 @@ react-timeago@^4.1.9:
   resolved "https://registry.yarnpkg.com/react-timeago/-/react-timeago-4.4.0.tgz#4520dd9ba63551afc4d709819f52b14b9343ba2b"
   integrity sha512-Zj8RchTqZEH27LAANemzMR2RpotbP2aMd+UIajfYMZ9KW4dMcViUVKzC7YmqfiqlFfz8B0bjDw2xUBjmcxDngA==
 
-react-transition-group@^4.3.0:
+react-transition-group@^4.3.0, react-transition-group@^4.4.1:
   version "4.4.5"
   resolved "https://registry.yarnpkg.com/react-transition-group/-/react-transition-group-4.4.5.tgz#e53d4e3f3344da8521489fbef8f2581d42becdd1"
   integrity sha512-pZcd1MCJoiKiBR2NRxeCRg13uCXbydPnmB4EOeRrY7480qNWO8IIgQG6zlDkm6uRMsURXPuKq0GWtiM59a5Q6g==

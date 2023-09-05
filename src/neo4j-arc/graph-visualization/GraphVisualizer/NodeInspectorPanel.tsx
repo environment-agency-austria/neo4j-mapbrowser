@@ -19,7 +19,11 @@
  */
 import React, { Component } from 'react'
 
-import { ChevronLeftIcon, ChevronRightIcon } from '../../common'
+import {
+  BasicNodesAndRels,
+  ChevronLeftIcon,
+  ChevronRightIcon
+} from '../../common'
 
 import {
   DefaultDetailsPane,
@@ -51,6 +55,7 @@ interface NodeInspectorPanelProps {
   width: number
   DetailsPaneOverride?: React.FC<DetailsPaneProps>
   OverviewPaneOverride?: React.FC<OverviewPaneProps>
+  updateQuery?: (query: string) => Promise<BasicNodesAndRels>
 }
 
 export const defaultPanelWidth = (): number =>
@@ -68,13 +73,14 @@ export class NodeInspectorPanel extends Component<NodeInspectorPanelProps> {
       toggleExpanded,
       width,
       DetailsPaneOverride,
-      OverviewPaneOverride
+      OverviewPaneOverride,
+      updateQuery
     } = this.props
     const relevantItems = ['node', 'relationship']
     const hoveringNodeOrRelationship =
       hoveredItem && relevantItems.includes(hoveredItem.type)
     const shownEl = hoveringNodeOrRelationship ? hoveredItem : selectedItem
-    const DetailsPane =
+    const DetailsPaneUsed =
       DetailsPaneOverride !== undefined
         ? DetailsPaneOverride
         : DefaultDetailsPane
@@ -82,6 +88,38 @@ export class NodeInspectorPanel extends Component<NodeInspectorPanelProps> {
       OverviewPaneOverride !== undefined
         ? OverviewPaneOverride
         : DefaultOverviewPane
+
+    const DetailsPane = (props: DetailsPaneProps) => {
+      const visualizer = this
+      if (DetailsPaneUsed) {
+        const panel = DetailsPaneUsed({
+          ...props,
+          onAttrEdit(vizItem, key, value) {
+            const prop = vizItem.item.propertyList.find(prop => prop.key == key)
+
+            if (prop) {
+              prop.value = value
+              console.log(key)
+
+              if (updateQuery) {
+                updateQuery(
+                  'match (n) where ID(n) = ' +
+                    vizItem.item.id +
+                    ' set n.`' +
+                    prop.key +
+                    '`=' +
+                    prop.value
+                )
+              }
+            }
+            visualizer.forceUpdate()
+          }
+        })
+        return panel
+      }
+
+      return null
+    }
 
     return (
       <>

@@ -24,7 +24,11 @@ import { withBus } from 'react-suber'
 import { Action, Dispatch } from 'redux'
 import { Bus } from 'suber'
 
-import { GraphModel, GraphVisualizer } from 'neo4j-arc/graph-visualization'
+import {
+  DetailsPaneProps,
+  GraphModel,
+  GraphVisualizer
+} from 'neo4j-arc/graph-visualization'
 
 import { StyledVisContainer } from './VisualizationView.styled'
 import { resultHasTruncatedFields } from 'browser/modules/Stream/CypherFrame/helpers'

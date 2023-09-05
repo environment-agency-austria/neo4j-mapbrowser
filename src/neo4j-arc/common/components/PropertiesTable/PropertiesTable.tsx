@@ -31,18 +31,31 @@ import {
 import { ClipboardCopier } from '../ClipboardCopier'
 import { ShowMoreOrAll } from '../ShowMoreOrAll/ShowMoreOrAll'
 import { VizItemProperty } from 'neo4j-arc/common'
+import { FileTable } from './FileTable'
+import { NodeFileTable } from './NodeFileTable'
 
 export const ELLIPSIS = '\u2026'
 export const WIDE_VIEW_THRESHOLD = 900
 export const MAX_LENGTH_NARROW = 150
 export const MAX_LENGTH_WIDE = 300
 type ExpandableValueProps = {
+  attrKey: string
   value: string
   width: number
   type: string
+  onAttrEdit?: (key: string, value: string) => void
 }
-function ExpandableValue({ value, width, type }: ExpandableValueProps) {
+
+function ExpandableValue({
+  attrKey,
+  value,
+  width,
+  type,
+  onAttrEdit
+}: ExpandableValueProps) {
   const [expanded, setExpanded] = useState(false)
+  const [edit, setEdit] = useState(false)
+  const [editValue, setEditValue] = useState(value)
 
   const maxLength =
     width > WIDE_VIEW_THRESHOLD ? MAX_LENGTH_WIDE : MAX_LENGTH_NARROW
@@ -55,10 +68,49 @@ function ExpandableValue({ value, width, type }: ExpandableValueProps) {
   const valueIsTrimmed = valueShown.length !== value.length
   valueShown += valueIsTrimmed ? ELLIPSIS : ''
 
+  const saveEdit = () => {
+    setEdit(false)
+    if (onAttrEdit) {
+      onAttrEdit(attrKey, editValue)
+    }
+  }
+
+  const cancelEdit = () => {
+    setEdit(false)
+    setEditValue(value)
+  }
+
   return (
     <>
       {type.startsWith('Array') && '['}
-      <ClickableUrls text={valueShown} />
+      {!edit && <ClickableUrls text={valueShown} edit={edit} />}
+      {edit && (
+        <label>
+          <input
+            title="bla"
+            type="text"
+            name="value"
+            defaultValue={editValue}
+            onInput={ev => setEditValue(ev.currentTarget.value)}
+          />
+        </label>
+      )}
+
+      {onAttrEdit && !edit && (
+        <StyledExpandValueButton onClick={() => setEdit(true)}>
+          {' Edit'}
+        </StyledExpandValueButton>
+      )}
+      {edit && (
+        <StyledExpandValueButton onClick={saveEdit}>
+          {' Save'}
+        </StyledExpandValueButton>
+      )}
+      {edit && (
+        <StyledExpandValueButton onClick={cancelEdit}>
+          {' Cancel'}
+        </StyledExpandValueButton>
+      )}
       {valueIsTrimmed && (
         <StyledExpandValueButton onClick={handleExpandClick}>
           {' Show all'}
@@ -72,6 +124,7 @@ function ExpandableValue({ value, width, type }: ExpandableValueProps) {
 type PropertiesViewProps = {
   visibleProperties: VizItemProperty[]
   onMoreClick: (numMore: number) => void
+  onAttrEdit?: (key: string, value: string) => void
   totalNumItems: number
   moreStep: number
   nodeInspectorWidth: number
@@ -80,6 +133,7 @@ export const PropertiesTable = ({
   visibleProperties,
   totalNumItems,
   onMoreClick,
+  onAttrEdit,
   moreStep,
   nodeInspectorWidth
 }: PropertiesViewProps): JSX.Element => {
@@ -91,13 +145,15 @@ export const PropertiesTable = ({
             {visibleProperties.map(({ key, type, value }) => (
               <tr key={key} title={type}>
                 <KeyCell>
-                  <ClickableUrls text={key} />
+                  <ClickableUrls text={key} edit={false} />
                 </KeyCell>
                 <ValueCell>
                   <ExpandableValue
+                    attrKey={key}
                     value={value}
                     width={nodeInspectorWidth}
                     type={type}
+                    onAttrEdit={onAttrEdit}
                   />
                 </ValueCell>
                 <CopyCell>
@@ -118,6 +174,15 @@ export const PropertiesTable = ({
         moreStep={moreStep}
         onMore={onMoreClick}
       />
+      <AlternatingTable>
+        <NodeFileTable
+          nodeId={
+            visibleProperties
+              .filter(vizProp => vizProp.key == '<id>')
+              .map(vizProp => vizProp.value)[0]
+          }
+        />
+      </AlternatingTable>
     </>
   )
 }

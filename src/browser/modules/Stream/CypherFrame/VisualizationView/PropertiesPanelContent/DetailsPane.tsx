@@ -30,7 +30,8 @@ export const DETAILS_PANE_STEP_SIZE = 1000
 export function DetailsPane({
   vizItem,
   graphStyle,
-  nodeInspectorWidth
+  nodeInspectorWidth,
+  onAttrEdit
 }: DetailsPaneProps): JSX.Element {
   const [maxPropertiesCount, setMaxPropertiesCount] = useState(
     DETAILS_PANE_STEP_SIZE
@@ -93,6 +94,9 @@ export function DetailsPane({
           moreStep={DETAILS_PANE_STEP_SIZE}
           totalNumItems={allItemProperties.length}
           nodeInspectorWidth={nodeInspectorWidth}
+          onAttrEdit={(key, value) => {
+            if (onAttrEdit) onAttrEdit(vizItem, key, value)
+          }}
         />
       </PaneBody>
     </PaneWrapper>

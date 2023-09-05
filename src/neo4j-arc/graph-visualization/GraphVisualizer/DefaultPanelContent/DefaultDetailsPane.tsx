@@ -32,6 +32,11 @@ export type DetailsPaneProps = {
   vizItem: NodeItem | RelationshipItem
   graphStyle: GraphStyleModel
   nodeInspectorWidth: number
+  onAttrEdit?: (
+    vizItem: NodeItem | RelationshipItem,
+    key: string,
+    value: string
+  ) => void
 }
 export function DefaultDetailsPane({
   vizItem,

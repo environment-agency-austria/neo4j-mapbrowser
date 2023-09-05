@@ -484,6 +484,7 @@ export class GraphVisualizer extends Component<
           }}
           DetailsPaneOverride={this.props.DetailsPaneOverride}
           OverviewPaneOverride={this.props.OverviewPaneOverride}
+          updateQuery={this.props.updateQuery}
         />
       </StyledFullSizeContainer>
     )
