@@ -174,15 +174,6 @@ export const PropertiesTable = ({
         moreStep={moreStep}
         onMore={onMoreClick}
       />
-      <AlternatingTable>
-        <NodeFileTable
-          nodeId={
-            visibleProperties
-              .filter(vizProp => vizProp.key == '<id>')
-              .map(vizProp => vizProp.value)[0]
-          }
-        />
-      </AlternatingTable>
     </>
   )
 }

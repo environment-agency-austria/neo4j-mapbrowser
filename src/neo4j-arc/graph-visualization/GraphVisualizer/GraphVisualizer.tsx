@@ -79,7 +79,7 @@ import { register } from 'ol/proj/proj4'
 import * as proj4x from 'proj4'
 import VectorLayer from 'ol/layer/Vector'
 import { Feature } from 'ol'
-import { SyncPanel } from './SyncPanel'
+import { AuStyle, SyncPanel } from './SyncPanel'
 const proj4 = (proj4x as any).default
 
 import { MapParent } from '../MapVisualizer/MapParent'
@@ -90,6 +90,7 @@ import {
   generateNodeBoundsQuery,
   setGraphNodes
 } from '../MapVisualizer/map_to_graph'
+import { MapParentPlain } from '../MapVisualizer/MapParentPlain'
 
 const DEFAULT_MAX_NEIGHBOURS = 100
 
@@ -156,8 +157,9 @@ type GraphVisualizerState = {
   nodeURLs: GeoNodeInfo[]
   mapGraph?: BasicNodesAndRels
   hiddenLayers: string[]
+  layer: AuStyle
   loadedLayers: string[]
-  mapPosition: number[]
+  mapPosition: [number, number]
   syncWithMap: boolean
   syncWithGraph: boolean
   bounds: any
@@ -230,14 +232,15 @@ export class GraphVisualizer extends Component<
       freezeLegend: false,
       width: defaultPanelWidth(),
       nodePropertiesExpanded: nodePropertiesExpandedByDefault,
-      mapPosition: [47.35, 13.63],
+      mapPosition: [1439448.760625712, 5844628.587897432],
       syncWithMap: true,
       syncWithGraph: false,
       bounds: null,
       zoom: 8,
       nodeURLs: [],
       hiddenLayers: [],
-      loadedLayers: []
+      loadedLayers: [],
+      layer: 'gemeinden'
     }
   }
 
@@ -350,6 +353,8 @@ export class GraphVisualizer extends Component<
       return
     }
 
+    //console.log(zoom + zoomDetailLevel)
+
     // wenn grob, keine Daten laden (nur für getFeatureInfo)
     if (zoom < zoomDetailLevel) {
       setGraphNodes({ nodes: [], relationships: [] }, this.g, this.geh)
@@ -367,8 +372,8 @@ export class GraphVisualizer extends Component<
       this.setState({
         nodes: resultGraph.nodes,
         mapGraph: resultGraph,
-        nodeURLs: nodeInfo,
-        loadedLayers: loadedLayers
+        nodeURLs: nodeInfo
+        //loadedLayers: loadedLayers
       })
 
       console.log('number of nodes returned: ' + resultGraph.nodes.length)
@@ -397,6 +402,12 @@ export class GraphVisualizer extends Component<
     this.setState({ hiddenLayers: layers })
   }
 
+  visibleLayersChanged = (layer: AuStyle) => {
+    if (this.state.layer !== layer) {
+      this.setState({ layer: layer })
+    }
+  }
+
   render(): JSX.Element {
     // This is a workaround to make the style reset to the same colors as when starting the browser with an empty style
     // If the legend component has the style it will ask the neoGraphStyle object for styling before the graph component,
@@ -411,6 +422,24 @@ export class GraphVisualizer extends Component<
 
     //const nodeURLs = this.convertBasicNodesToURL(this.state.nodes)
 
+    /*
+        <MapParent
+          position={[this.state.mapPosition[0], this.state.mapPosition[1]]}
+          zoomLevel={8}
+          graph={this.g}
+          geh={this.geh}
+          nodeURLs={
+            this.state.nodeURLs
+              .filter(n => !this.state.hiddenLayers.includes(n.layers[0])) // || this.state.syncWithGraph) //TODO: Hack to avoid unknown layer bug
+              .map(n => n.url)
+            }
+            syncGraphWithMap={this.syncGraphWithMap}
+            syncWithMap={this.state.syncWithMap}
+            syncWithGraph={this.state.syncWithGraph}
+            selectedItem={this.state.selectedItem}
+          />
+*/
+
     return (
       <StyledFullSizeContainer id="svg-vis">
         <div style={{ position: 'absolute', top: '30px', zIndex: 1000 }}>
@@ -419,7 +448,7 @@ export class GraphVisualizer extends Component<
             syncWithGraph={this.state.syncWithGraph}
             syncOptionsChanged={this.syncOptionsChanged}
             layers={this.state.loadedLayers}
-            hiddenLayersChanged={this.hiddenLayersChanged}
+            layerChanged={this.visibleLayersChanged}
           />
         </div>
 
@@ -448,21 +477,14 @@ export class GraphVisualizer extends Component<
           onGraphInteraction={this.props.onGraphInteraction}
         />
 
-        <MapParent
-          position={[this.state.mapPosition[0], this.state.mapPosition[1]]}
-          zoomLevel={8}
+        <MapParentPlain
+          mapPosition={this.state.mapPosition}
+          syncGraphWithMap={this.syncGraphWithMap}
+          selectedItem={this.state.selectedItem}
           graph={this.g}
           geh={this.geh}
-          nodeURLs={
-            this.state.nodeURLs
-              .filter(n => !this.state.hiddenLayers.includes(n.layers[0])) // || this.state.syncWithGraph) //TODO: Hack to avoid unknown layer bug
-              .map(n => n.url) /*TODO: only checks for first layer*/
-          }
-          syncGraphWithMap={this.syncGraphWithMap}
-          syncWithMap={this.state.syncWithMap}
-          syncWithGraph={this.state.syncWithGraph}
-          selectedItem={this.state.selectedItem}
-        />
+          auStyle={this.state.layer ?? 'gemeinden'}
+        ></MapParentPlain>
 
         <NodeInspectorPanel
           graphStyle={graphStyle}

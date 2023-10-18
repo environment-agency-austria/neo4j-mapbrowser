@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
 
+export type AuStyle = 'bundeslaender' | 'bezirke' | 'gemeinden'
+
 export type SyncPanelProps = {
   syncWithMapBounds: boolean
   syncWithGraph: boolean
@@ -8,27 +10,21 @@ export type SyncPanelProps = {
     syncWithGraph: boolean
   ) => void
   layers: string[]
-  hiddenLayersChanged: (layers: string[]) => void
+  layerChanged: (layer: AuStyle) => void
 }
 
 export function SyncPanel(props: SyncPanelProps) {
-  const [hiddenLayers, setHiddenLayers] = useState(new Set(props.layers))
+  const [shownLayer, setShownLayer] = useState<AuStyle>('bezirke')
+  props.layerChanged(shownLayer)
 
-  const layers = props.layers.map(layerName => (
+  const layers = ['bundeslaender', 'bezirke', 'gemeinden'].map(layerName => (
     <label key={layerName} style={{ flexBasis: '100%' }}>
       <input
         type="checkbox"
-        checked={!hiddenLayers.has(layerName)}
-        onChange={value => {
-          const newSet = new Set(hiddenLayers)
-          if (!value.target.checked) {
-            newSet.add(layerName)
-          } else {
-            newSet.delete(layerName)
-          }
-          setHiddenLayers(newSet)
-
-          props.hiddenLayersChanged(props.layers.filter(l => newSet.has(l)))
+        checked={shownLayer == layerName}
+        onChange={() => {
+          setShownLayer(layerName as AuStyle)
+          props.layerChanged(layerName as AuStyle)
         }}
       />
       {layerName}
@@ -64,7 +60,7 @@ export function SyncPanel(props: SyncPanelProps) {
         />
         Sync Map with Nodes
       </label>
-      Layers:
+      Verwaltungsgrundkarte:
       {layers}
     </div>
   )

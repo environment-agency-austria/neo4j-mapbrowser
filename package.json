@@ -182,6 +182,7 @@
     "@sentry/react": "^5.29.0",
     "@sentry/tracing": "^5.27.0",
     "@types/geojson": "^7946.0.10",
+    "@types/leaflet": "^1.9.6",
     "@types/proj4": "^2.5.2",
     "apollo-upload-client": "^14.1.2",
     "ascii-data-table": "^2.1.1",

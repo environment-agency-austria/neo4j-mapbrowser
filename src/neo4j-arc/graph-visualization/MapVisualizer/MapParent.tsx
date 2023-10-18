@@ -143,18 +143,9 @@ function MapParent(props: MapParentProps) {
         pathOptions={{ color: 'blue', weight: 1 }}
       />
     )
-  } else if (props.syncWithMap) {
-    layer = (
-      <WMSTileLayer
-        url="http://swwat.grillmayer.eu:8080/geoserver/ows?SERVICE=WMS&"
-        params={{
-          layers: 'swwat:GefahrenzonenPublic',
-          transparent: true,
-          format: 'image/png'
-        }}
-      />
-    )
   }
+
+  //        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
   return (
     <div style={{ width: '100%', height: '100%' }}>
@@ -166,7 +157,24 @@ function MapParent(props: MapParentProps) {
         zoom={zoomLevel}
         scrollWheelZoom={true}
       >
-        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <WMSTileLayer
+          url="https://geoserver-admin.rest-gdi.geo-data.space/geoserver/au/wms?service=WMS&"
+          params={{
+            layers: 'au:AdministrativUnits',
+            transparent: true,
+            format: 'image/png',
+            styles: 'gemeinden'
+          }}
+        />
+
+        <WMSTileLayer
+          url="https://geoserver-admin.rest-gdi.geo-data.space/geoserver/ps/wms?service=WMS&"
+          params={{
+            layers: 'ps:ProtectedSite',
+            transparent: true,
+            format: 'image/png'
+          }}
+        />
         <GeoJSON
           key={Math.random()}
           data={selectedGeoData}

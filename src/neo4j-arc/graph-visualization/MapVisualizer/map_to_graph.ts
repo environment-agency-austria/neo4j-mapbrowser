@@ -45,28 +45,29 @@ function setGraphNodes(
 }
 
 function generateNodeBoundsQuery(bounds: any) {
-  const southWestTrx = olProj.fromLonLat(
-    [bounds._southWest.lng, bounds._southWest.lat],
-    'EPSG:31287'
-  )
-  const northEastTrx = olProj.fromLonLat(
-    [bounds._northEast.lng, bounds._northEast.lat],
-    'EPSG:31287'
-  )
+  const southWestTrx = [bounds[2], bounds[3]] //olProj.fromLonLat([bounds[0], bounds[1]], 'EPSG:31287');
+  const northEastTrx = [bounds[0], bounds[1]] //olProj.fromLonLat([bounds[2], bounds[3]], 'EPSG:31287');
 
-  //console.log(JSON.stringify(northWest) + " - " + JSON.stringify(southEast));
-  //+ " AND n.y1 <= " + northEastTrx[1]
-  //+" AND n.x2 <= " + southWestTrx[0]  +
   const query =
-    'MATCH(n) WHERE n.x1 <= ' +
+    'MATCH(n:Schutzgebiet_v2) WHERE ' +
+    '     toFloat(n.x_max) >= ' +
     northEastTrx[0] +
-    ' AND n.x2 >= ' +
-    southWestTrx[0] +
-    ' AND n.y1 <= ' +
+    ' AND toFloat(n.y_max) >= ' +
     northEastTrx[1] +
-    ' AND n.y2 >= ' +
+    ' AND toFloat(n.x_min) <= ' +
+    southWestTrx[0] +
+    ' AND toFloat(n.y_min) <= ' +
     southWestTrx[1] +
-    ' MATCH path = (n)--() return path;'
+    ' OPTIONAL MATCH (n)-[r]-(m) return n, r, m;'
+
+  /*
+  const query =
+    'MATCH(n) WHERE ' +
+    '     toFloat(n.x_max) <= ' + southWestTrx[0] +
+    ' AND toFloat(n.y_max) <= ' + southWestTrx[1] +
+    ' AND toFloat(n.x_min) >= ' + northEastTrx[0] +
+    ' AND toFloat(n.y_min) >= ' + northEastTrx[1] +
+    ' MATCH path = (n)--() return path;'*/
 
   return query
 }

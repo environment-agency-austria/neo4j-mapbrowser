@@ -2512,6 +2512,11 @@
   resolved "https://registry.yarnpkg.com/@types/file-saver/-/file-saver-2.0.1.tgz#e18eb8b069e442f7b956d313f4fadd3ef887354e"
   integrity sha1-4Y64sGnkQve5VtMT9PrdPviHNU4=
 
+"@types/geojson@*":
+  version "7946.0.11"
+  resolved "https://registry.yarnpkg.com/@types/geojson/-/geojson-7946.0.11.tgz#012c17cb2256ad8de78560da851ab914a7b9b40e"
+  integrity sha512-L7A0AINMXQpVwxHJ4jxD6/XjZ4NDufaRlUJHjNIFKYUFBH1SvOW+neaqb0VTRSLW5suSrSu19ObFEFnfNcr+qg==
+
 "@types/geojson@^7946.0.10":
   version "7946.0.10"
   resolved "https://registry.yarnpkg.com/@types/geojson/-/geojson-7946.0.10.tgz#6dfbf5ea17142f7f9a043809f1cd4c448cb68249"
@@ -2628,6 +2633,13 @@
   version "0.3.0"
   resolved "https://registry.yarnpkg.com/@types/jsonic/-/jsonic-0.3.0.tgz#2f50d613b1485bf53393ce55ceaacb5358f90814"
   integrity sha1-L1DWE7FIW/Uzk85VzqrLU1j5CBQ=
+
+"@types/leaflet@^1.9.6":
+  version "1.9.6"
+  resolved "https://registry.yarnpkg.com/@types/leaflet/-/leaflet-1.9.6.tgz#d58ecdbe9f1f383cb0a7133a020cd05bfe00a762"
+  integrity sha512-HakGTK5LBBWegNWsAmTlG55zN1zszYec7aG47/z6SzT90bW2vqjmbqk3YKAbrtveO+G7fSTKTYqVbIwAFnTrbg==
+  dependencies:
+    "@types/geojson" "*"
 
 "@types/lodash-es@^4.17.6":
   version "4.17.6"
@@ -12466,7 +12478,7 @@ react-is@^16.12.0, react-is@^16.13.1, react-is@^16.6.0, react-is@^16.6.3, react-
 "react-leaflet@file:../react-leaflet/packages/react-leaflet":
   version "3.2.5"
   dependencies:
-    "@react-leaflet/core" "file:../../Users/eisserer/AppData/Local/Yarn/Cache/v6/npm-react-leaflet-3.2.5-f6e202b9-6e67-4550-88f7-b6cd7efd2c32-1693222506209/node_modules/core"
+    "@react-leaflet/core" "file:../../Users/eisserer/AppData/Local/Yarn/Cache/v6/npm-react-leaflet-3.2.5-2ba09f92-740e-4236-ba54-41aaffe9e81f-1697013563163/node_modules/core"
 
 react-lifecycles-compat@^3.0.0, react-lifecycles-compat@^3.0.4:
   version "3.0.4"
