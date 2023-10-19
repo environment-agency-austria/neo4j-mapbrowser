@@ -54,20 +54,6 @@ import {
   GraphEventHandlerModel,
   GraphInteractionCallBack
 } from './Graph/GraphEventHandlerModel'
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Popup,
-  GeoJSON,
-  useMap,
-  useMapEvent,
-  useMapEvents,
-  LayerGroup,
-  LayerGroupProps,
-  WMSTileLayer,
-  LayersControl
-} from 'react-leaflet'
 import { GeoJsonObject, FeatureCollection } from 'geojson'
 
 import { WFS, GML } from 'ol/format'
