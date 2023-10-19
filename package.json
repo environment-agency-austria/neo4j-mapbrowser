@@ -220,7 +220,6 @@
     "react-dnd-html5-backend": "^11.1.3",
     "react-dom": "^17.0.2",
     "react-is": "^17.0.2",
-    "react-leaflet": "file:../react-leaflet/packages/react-leaflet",
     "react-markdown": "^8.0.0",
     "react-redux": "^5.0.7",
     "react-suber": "1.0.4",
