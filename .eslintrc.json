@@ -29,6 +29,12 @@
           "^monaco-editor$"
         ]
       }
+    ],
+    "react/no-unknown-property": [
+      2,
+      {
+        "ignore": ["jsx"]
+      }
     ]
   },
   "globals": {

@@ -49,14 +49,14 @@ function generateNodeBoundsQuery(bounds: any) {
   const northEastTrx = [bounds[0], bounds[1]] //olProj.fromLonLat([bounds[2], bounds[3]], 'EPSG:31287');
 
   const query =
-    'MATCH(n:Schutzgebiet_v2) WHERE ' +
-    '     toFloat(n.x_max) >= ' +
+    'MATCH(n:Schutzgebiet) WHERE ' +
+    '     n.x_max >= ' +
     northEastTrx[0] +
-    ' AND toFloat(n.y_max) >= ' +
+    ' AND n.y_max >= ' +
     northEastTrx[1] +
-    ' AND toFloat(n.x_min) <= ' +
+    ' AND n.x_min <= ' +
     southWestTrx[0] +
-    ' AND toFloat(n.y_min) <= ' +
+    ' AND n.y_min <= ' +
     southWestTrx[1] +
     ' OPTIONAL MATCH (n)-[r]-(m) return n, r, m;'
 

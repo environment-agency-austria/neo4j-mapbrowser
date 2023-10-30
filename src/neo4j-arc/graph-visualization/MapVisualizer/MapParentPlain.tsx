@@ -1,10 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react'
-import 'leaflet/dist/leaflet.css'
-import L from 'leaflet'
+import React, { useEffect, useReducer, useRef, useState } from 'react'
 
 import { register } from 'ol/proj/proj4'
-import * as proj4x from 'proj4'
-const proj4 = (proj4x as any).default
+import * as projx from 'proj4'
+const proj4 = (projx as any).default
 
 import OLMap from 'ol/Map'
 import View from 'ol/View'
@@ -23,8 +21,12 @@ import { Collection, Feature } from 'ol'
 import VectorLayer from 'ol/layer/Vector'
 import VectorSource from 'ol/source/Vector'
 import { Geometry } from 'ol/geom'
-import { WFS } from 'ol/format'
+import { WFS, GeoJSON } from 'ol/format'
 import GML32 from 'ol/format/GML32'
+import { FeatureCollection } from 'geojson'
+import Style from 'ol/style/Style'
+import Fill from 'ol/style/Fill'
+import Stroke from 'ol/style/Stroke'
 
 export type MapParentPlainProps = {
   mapPosition: [number, number]
@@ -33,124 +35,221 @@ export type MapParentPlainProps = {
   graph?: GraphModel
   geh?: GraphEventHandlerModel
   auStyle: 'bundeslaender' | 'bezirke' | 'gemeinden'
+  syncWithGraph: boolean
 }
 
-async function loadFeatures(
-  selectedItem: VizItem,
-  featureCache: Map<string, Feature<Geometry> | null>
-) {
-  const selId = (selectedItem.item as NodeModel).propertyList.find(
-    p => p.key === 'gml:identiifer'
-  )?.value
-  if (selId) {
-    fetch(selId)
-      .then(response => response.text())
-      .then(gml => {
-        const parser = new WFS({
-          featureNS: 'http://mapserver.gis.umn.edu/mapserver',
-          version: '2.0.0'
-        })
+type IdFeaturePair = { id: string; feature: Feature<Geometry> } | null
 
-        const wfsFeatures = parser.readFeatures(gml)
-        const gmlString = new GML32({
-          srsName: 'urn:ogc:def:crs:EPSG::4326',
-          featureNS: 'swaat'
-        }).writeFeatures(wfsFeatures)
+function registerProjections() {
+  proj4.defs(
+    'EPSG:31287',
+    '+proj=lcc +axis=neu +lat_0=47.5 +lon_0=13.3333333333333 +lat_1=49 +lat_2=46 +x_0=400000 +y_0=400000 +ellps=bessel +towgs84=577.326,90.129,463.919,5.137,1.474,5.297,2.42319999999019 +units=m +no_defs +type=crs'
+  )
+  proj4.defs(
+    'EPSG:31258',
+    '+proj=tmerc +lat_0=0 +lon_0=13.3333333333333 +k=1 +x_0=450000 +y_0=-5000000 +ellps=bessel +towgs84=577.326,90.129,463.919,5.137,1.474,5.297,2.4232 +units=m +no_defs +type=crs'
+  )
+  proj4.defs(
+    'EPSG:3035',
+    '+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +towgs84=565.04,49.91,465.84,1.9848,-1.7439,9.0587,4.0772 +units=m +no_defs +type=crs'
+  )
+  register(proj4)
+}
+
+function getGmlUrlFromNode(node: NodeModel) {
+  return node.propertyList.find(p => p.key === 'gml:identifer')?.value
+}
+
+// asynchronously loads a single feature
+async function loadFeature(
+  gmlUri: string,
+  targetProjection: olProj.Projection
+): Promise<IdFeaturePair> {
+  if (gmlUri) {
+    const selIdWithFormat = gmlUri + '?outputFormat=application/json'
+    const fetchPromise = fetch(selIdWithFormat)
+      .then(response => response.text())
+      .then(txt => {
+        const featureCollection = new GeoJSON().readFeatures(txt, {
+          dataProjection: 'EPSG:3035',
+          featureProjection: targetProjection
+        })
+        return { id: gmlUri, feature: featureCollection[0] }
       })
+
+    // @ts-ignore
+    return fetchPromise
+  } else {
+    return Promise.resolve(null)
   }
-  console.log(selId)
-  console.log(featureCache.size)
+}
+
+function loadUncachedFeatures(
+  cache: Map<string, Feature<Geometry> | null>,
+  gmlUris: string[],
+  targetProjection: olProj.Projection,
+  featureLoadedCB: (ft: IdFeaturePair) => void
+) {
+  // considere only features not already contained in the cache
+  const allLoads = gmlUris.filter(uri => !cache.has(uri))
+  const pendingLoads = new Set<string>(allLoads)
+  // mark all non-existent urls as currently loading (feature = null)
+  // so no futher attempts are made to load this multiple times
+  allLoads.forEach(uri => cache.set(uri, null))
+
+  function loadUri(uri: string): Promise<any> {
+    pendingLoads.delete(uri)
+    const featurePromise = loadFeature(uri, targetProjection)
+    return featurePromise.then(ft => {
+      if (ft) {
+        cache.set(uri, ft.feature)
+        featureLoadedCB(ft)
+      }
+
+      if (pendingLoads.size > 0) {
+        return loadUri(pendingLoads.values().next().value)
+      } else {
+        return ft
+      }
+    })
+  }
+
+  // Fetch the first PARALLEL_FETCH_COUNT requests, once finished each request
+  // will begin to initiate another fetch again until all open requests (pendingLoads)
+  // are fulfilled.
+  const PARALLEL_FETCH_COUNT = 10
+  for (let i = 0; i < Math.min(PARALLEL_FETCH_COUNT, allLoads.length); i++) {
+    loadUri(allLoads[i])
+  }
 }
 
 export function MapParentPlain(props: MapParentPlainProps) {
-  //TODO: Use correct transformation
-  useEffect(() => {
-    proj4.defs(
-      'EPSG:31287',
-      '+proj=lcc +axis=neu +lat_0=47.5 +lon_0=13.3333333333333 +lat_1=49 +lat_2=46 +x_0=400000 +y_0=400000 +ellps=bessel +towgs84=577.326,90.129,463.919,5.137,1.474,5.297,2.42319999999019 +units=m +no_defs +type=crs'
-    )
-    proj4.defs(
-      'EPSG:31258',
-      '+proj=tmerc +lat_0=0 +lon_0=13.3333333333333 +k=1 +x_0=450000 +y_0=-5000000 +ellps=bessel +towgs84=577.326,90.129,463.919,5.137,1.474,5.297,2.4232 +units=m +no_defs +type=crs'
-    )
-    proj4.defs(
-      'EPSG:3035',
-      '+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +towgs84=565.04,49.91,465.84,1.9848,-1.7439,9.0587,4.0772 +units=m +no_defs +type=crs'
-    )
-    register(proj4)
-  }, [])
-
-  console.log(props)
-
-  useEffect(() => {
-    /* var container = L.DomUtil.get("map");
-
-        if (container != null) {
-            // @ts-ignore
-            container._leaflet_id = null;
-        }
-
-        var map = L.map("map").setView(props.mapPosition, 6);
-
-        var auLayer = L.tileLayer.WMS('https://geoserver-admin.rest-gdi.geo-data.space/geoserver/au/wms?service=WMS&', {
-            layers: 'au:AdministrativUnits',
-            transparent: true,
-            format: 'image/png',
-            styles : 'gemeinden'
-          }).addTo(map);
-
-         var psLayer = L.tileLayer.WMS('https://geoserver-admin.rest-gdi.geo-data.space/geoserver/ps/wms?service=WMS&', {
-            layers: 'ps:ProtectedSite',
-            transparent: true,
-            format: 'image/png'
-          }).addTo(map);
-
-
-          map.on('click', e => {
-            psLayer.get
-          });
-          */
-  }, [])
+  useEffect(registerProjections, [])
 
   const currentProps = useRef(props)
   currentProps.current = props
 
+  const [_, forceUpdate] = useReducer(x => x + 1, 0)
   const featureCache = useRef(new Map<string, Feature<Geometry> | null>())
-  const selectedFeatures = useRef(new Collection<Feature<Geometry>>())
+  const selectedFeature = useRef<IdFeaturePair | null>(null)
+  const selectedFeatureCollection = useRef(new Collection<Feature<Geometry>>())
+
+  const visibleFeatures = useRef(new Map<string, Feature<Geometry>>())
+  const visibleFeatureCollection = useRef(new Collection<Feature<Geometry>>())
 
   const mapTargetElement = useRef<HTMLDivElement>(null)
   const [map, setMap] = useState<OLMap | undefined>()
   const [auLayer, setAuLayer] = useState<TileLayer<TileWMS> | undefined>()
 
-  if (props.selectedItem && props.selectedItem.type === 'node') {
-    loadFeatures(props.selectedItem, featureCache.current)
+  // selected node handling
+  if (map && props.selectedItem && props.selectedItem.type === 'node') {
+    const gmlUri = getGmlUrlFromNode(props.selectedItem.item as NodeModel)
+
+    if (gmlUri) {
+      loadUncachedFeatures(
+        featureCache.current,
+        [gmlUri],
+        map.getView().getProjection(),
+        () => forceUpdate()
+      )
+
+      if (
+        selectedFeature.current == null ||
+        selectedFeature.current.id != gmlUri
+      ) {
+        selectedFeatureCollection.current.clear()
+
+        const feature = featureCache.current.get(gmlUri)
+        if (feature) {
+          selectedFeatureCollection.current.push(feature)
+          selectedFeature.current = { id: gmlUri, feature: feature }
+        } else {
+          selectedFeature.current = null
+        }
+      }
+    }
+  } else {
+    selectedFeatureCollection.current.clear()
+    selectedFeature.current = null
+  }
+
+  // vector nodes handling
+  if (props.syncWithGraph && props.graph && map) {
+    const nodeURLs = props.graph
+      .nodes()
+      .filter(n => n.propertyMap['gml:identifier'])
+      .map(n => ({ url: n.propertyMap['gml:identifier'], layers: n.labels }))
+
+    //make sure all features are loaded into cache
+    loadUncachedFeatures(
+      featureCache.current,
+      nodeURLs.map(nu => nu.url),
+      map.getView().getProjection(),
+      () => forceUpdate()
+    )
+
+    // add/remove features from vector layer
+    const urlsToShow = new Set(nodeURLs.map(nu => nu.url))
+    const featuresToRemove = Array.from(visibleFeatures.current.keys()).filter(
+      url => !urlsToShow.has(url)
+    )
+    if (featuresToRemove.length > 0) {
+      visibleFeatureCollection.current.clear()
+      visibleFeatures.current.clear()
+    }
+    const featuresToAdd = nodeURLs.filter(
+      nu => !visibleFeatures.current.has(nu.url)
+    )
+    featuresToAdd.forEach(url => {
+      const feature = featureCache.current.get(url.url)
+      if (feature) {
+        visibleFeatures.current.set(url.url, feature)
+        visibleFeatureCollection.current.push(feature)
+      }
+    })
+  } else {
+    visibleFeatureCollection.current.clear()
+    visibleFeatures.current.clear()
   }
 
   useEffect(() => {
     const view = new View({
       center: props.mapPosition,
+      projection: 'EPSG:3035',
       zoom: 6,
       minZoom: 0,
       maxZoom: 28
     })
 
-    const psLayer = new TileLayer({
-      source: new TileWMS({
-        url: 'https://geoserver2-admin.rest-gdi.geo-data.space/geoserver/ps/wms?service=WMS',
-        params: { LAYERS: 'ps:ProtectedSite', TILED: true },
-        serverType: 'geoserver',
-        transition: 0
-      })
+    const vectorLayer = new VectorLayer({
+      source: new VectorSource({
+        features: visibleFeatureCollection.current
+      }),
+      zIndex: 2
     })
 
     const selectLayer = new VectorLayer({
       source: new VectorSource({
-        features: selectedFeatures.current
+        features: selectedFeatureCollection.current
+      }),
+      zIndex: 3,
+      style: new Style({
+        fill: new Fill({
+          color: 'red'
+        }),
+        stroke: new Stroke({
+          color: 'black'
+        })
       })
     })
 
+    const osmLayer = new TileLayer({
+      source: new OSM(),
+      zIndex: 0
+    })
+
     const map = new OLMap({
-      layers: [new TileLayer({ source: new OSM() }), psLayer, selectLayer],
+      layers: [osmLayer, vectorLayer, selectLayer],
 
       controls: [],
 
@@ -173,46 +272,61 @@ export function MapParentPlain(props: MapParentPlainProps) {
 
     map.on('singleclick', e => {
       const viewResolution = view.getResolution() ?? 0
-      console.log(view.getCenter())
-      const url = psLayer
-        .getSource()
-        ?.getFeatureInfoUrl(e.coordinate, viewResolution, 'EPSG:3857', {
-          INFO_FORMAT: 'text/plain'
-        })
-      if (url) {
-        fetch(url)
-          .then(response => response.text())
-          .then(txt => {
-            const idPos = txt.indexOf('id=') + 3
-            const startTrimmed = txt.substring(idPos)
-            const id = startTrimmed.substring(0, startTrimmed.indexOf('>'))
-            console.log(id)
 
-            if (currentProps.current.graph && currentProps.current.geh) {
-              const selectedNode = currentProps.current.graph
-                .nodes()
-                .find(n =>
-                  n.propertyList.find(p => p.key === 'gml:id' && p.value === id)
-                )
-              if (selectedNode) {
-                currentProps.current.geh.selectItem(selectedNode)
-              }
+      function selectNodeById(selid: string) {
+        if (selid && currentProps.current.graph && currentProps.current.geh) {
+          const selectedNode = currentProps.current.graph
+            .nodes()
+            .find(n =>
+              n.propertyList.find(p => p.key === 'gml:id' && p.value === selid)
+            )
+          if (selectedNode) {
+            currentProps.current.geh.selectItem(selectedNode)
+            currentProps.current.geh.onItemSelected({
+              type: 'node',
+              item: selectedNode
+            })
+            forceUpdate()
+          }
+        }
+      }
+
+      if (psLayer.current) {
+        const url = psLayer.current
+          .getSource()
+          ?.getFeatureInfoUrl(
+            e.coordinate,
+            viewResolution,
+            map.getView().getProjection(),
+            {
+              INFO_FORMAT: 'text/plain'
             }
-          })
+          )
+        if (url) {
+          fetch(url)
+            .then(response => response.text())
+            .then(txt => {
+              const idPos = txt.indexOf('id=') + 3
+              const startTrimmed = txt.substring(idPos)
+              const id = startTrimmed.substring(0, startTrimmed.indexOf('>'))
+              selectNodeById(id)
+            })
+        }
+      } else {
+        const allFeatures = map.getFeaturesAtPixel(e.pixel)
+        const vectorIds = allFeatures
+          .map(node => node.getId())
+          .filter(id => typeof id === 'string')
+          .map(id => id as string)
+          .filter(id => id.indexOf('ProtectedSite') > -1)
+
+        //TODO: Handle multiple layers
+        if (vectorIds.length > 0) {
+          selectNodeById(vectorIds[0])
+        }
       }
     })
 
-    /*        map.on('pointermove', e => {
-            if (e.dragging) {
-              return;
-            }
-            const psData = psLayer.getData(e.pixel);
-            console.log(psData)
-            //const auData = auLayer.getData(e.pixel);
-            //const hit = (psData && psData[3] > 0); // transparent pixels have zero for data[3]
-            //map.getTargetElement().style.cursor = hit ? 'pointer' : '';
-          });
-*/
     map.setTarget(mapTargetElement.current || '')
     setMap(map)
     return () => map.setTarget('')
@@ -229,8 +343,10 @@ export function MapParentPlain(props: MapParentPlainProps) {
         params: {
           LAYERS: 'au:AdministrativUnits',
           TILED: true,
-          STYLES: props.auStyle
+          STYLES: props.auStyle,
+          VERSION: '1.1.1'
         },
+        projection: 'EPSG:3035',
         serverType: 'geoserver',
         transition: 0
       })
@@ -240,14 +356,33 @@ export function MapParentPlain(props: MapParentPlainProps) {
     map?.addLayer(newAuLayer)
   }, [props.auStyle, map])
 
+  const psLayer = useRef<TileLayer<TileWMS> | null>(null)
   useEffect(() => {
-    if (props.selectedItem.type == 'node') {
-      const url = (props.selectedItem.item as NodeModel).propertyMap[
-        'gml:identifier'
-      ]
-      console.log(url)
+    if (map) {
+      if (props.syncWithGraph) {
+        if (psLayer.current) {
+          map.removeLayer(psLayer.current)
+          psLayer.current = null
+        }
+      } else {
+        psLayer.current = new TileLayer({
+          source: new TileWMS({
+            url: 'https://geoserver2-admin.rest-gdi.geo-data.space/geoserver/ps/wms?service=WMS',
+            params: {
+              LAYERS: 'ps:ProtectedSite',
+              TILED: true,
+              VERSION: '1.1.1'
+            },
+            serverType: 'geoserver',
+            transition: 0
+          }),
+          zIndex: 1
+        })
+
+        map.addLayer(psLayer.current)
+      }
     }
-  }, [props.selectedItem])
+  }, [props.syncWithGraph, props.syncGraphWithMap, map])
 
   return (
     <>

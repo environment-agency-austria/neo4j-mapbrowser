@@ -62,11 +62,11 @@ import { GeoJSON as OLGeoJson } from 'ol/format'
 import { LineString, Point } from 'ol/geom'
 
 import { register } from 'ol/proj/proj4'
-import * as proj4x from 'proj4'
+//import * as proj4x from 'proj4'
 import VectorLayer from 'ol/layer/Vector'
 import { Feature } from 'ol'
 import { AuStyle, SyncPanel } from './SyncPanel'
-const proj4 = (proj4x as any).default
+//const proj4 = (proj4x as any).default
 
 import { MapParent } from '../MapVisualizer/MapParent'
 import { convertBasicNodesToGeoNodeInfo } from '../MapVisualizer/graph_to_map'
@@ -218,7 +218,7 @@ export class GraphVisualizer extends Component<
       freezeLegend: false,
       width: defaultPanelWidth(),
       nodePropertiesExpanded: nodePropertiesExpandedByDefault,
-      mapPosition: [1439448.760625712, 5844628.587897432],
+      mapPosition: [4571802.512166972, 2727798.8987145913],
       syncWithMap: true,
       syncWithGraph: false,
       bounds: null,
@@ -465,11 +465,12 @@ export class GraphVisualizer extends Component<
 
         <MapParentPlain
           mapPosition={this.state.mapPosition}
-          syncGraphWithMap={this.syncGraphWithMap}
           selectedItem={this.state.selectedItem}
           graph={this.g}
           geh={this.geh}
           auStyle={this.state.layer ?? 'gemeinden'}
+          syncGraphWithMap={this.syncGraphWithMap}
+          syncWithGraph={this.state.syncWithGraph}
         ></MapParentPlain>
 
         <NodeInspectorPanel

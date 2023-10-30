@@ -2168,9 +2168,6 @@
   resolved "https://registry.yarnpkg.com/@react-dnd/shallowequal/-/shallowequal-2.0.0.tgz#a3031eb54129f2c66b2753f8404266ec7bf67f0a"
   integrity sha1-owMetUEp8sZrJ1P4QEJm7Hv2fwo=
 
-"@react-leaflet/core@file:../react-leaflet/packages/core":
-  version "1.1.1"
-
 "@scarf/scarf@^0.1.5":
   version "0.1.8"
   resolved "https://registry.yarnpkg.com/@scarf/scarf/-/scarf-0.1.8.tgz#7e1e67563a9787de0d1779de96c1c4c84d22d16d"
@@ -12474,11 +12471,6 @@ react-is@^16.12.0, react-is@^16.13.1, react-is@^16.6.0, react-is@^16.6.3, react-
   version "18.2.0"
   resolved "https://registry.yarnpkg.com/react-is/-/react-is-18.2.0.tgz#199431eeaaa2e09f86427efbb4f1473edb47609b"
   integrity sha512-xWGDIW6x921xtzPkhiULtthJHoJvBbF3q26fzloPCK0hsvxtPVelvftw3zjbHWSkR2km9Z+4uxbDDK/6Zw9B8w==
-
-"react-leaflet@file:../react-leaflet/packages/react-leaflet":
-  version "3.2.5"
-  dependencies:
-    "@react-leaflet/core" "file:../../Users/eisserer/AppData/Local/Yarn/Cache/v6/npm-react-leaflet-3.2.5-2ba09f92-740e-4236-ba54-41aaffe9e81f-1697013563163/node_modules/core"
 
 react-lifecycles-compat@^3.0.0, react-lifecycles-compat@^3.0.4:
   version "3.0.4"
