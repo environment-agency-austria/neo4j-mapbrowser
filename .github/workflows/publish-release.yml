@@ -59,7 +59,9 @@ jobs:
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
         with:
           images: ceisserer/neo4j-browser-withmap
-          tags: type=raw,value={{tag}}
+          tags: |
+                  type=raw,value={{tag}}
+                  type=raw,value=latest
 
       - name: Build and push Docker image
         uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
@@ -67,7 +69,5 @@ jobs:
           context: .
           file: Dockerfile
           push: true
-          tags: |
-            ${{ steps.meta.outputs.tags }}
-            'latest'
+          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
