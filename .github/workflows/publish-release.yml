@@ -28,6 +28,11 @@ jobs:
         uses: little-core-labs/get-git-tag@v3.0.1
         id: tagName
 
+      - name: Dump steps context
+        env:
+          STEPS_CONTEXT: ${{ toJson(steps) }}
+        run: echo "$STEPS_CONTEXT"
+
       - name: Set Node.js 16.x
         uses: actions/setup-node@v3
         with:
