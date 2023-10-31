@@ -29,10 +29,9 @@ jobs:
         uses: olegtarasov/get-tag@v2.1.2
         id: tagName
 
-      - name: Dump steps context
-        env:
-          STEPS_CONTEXT: ${{ toJson(steps) }}
-        run: echo "$STEPS_CONTEXT"
+
+      - name: "print tag"
+        run: echo "$GIT_TAG_NAME"
 
       - name: Set Node.js 16.x
         uses: actions/setup-node@v3
@@ -69,7 +68,7 @@ jobs:
           images: |
             ceisserer/neo4j-browser-withmap
             ghcr.io/${{ github.repository }}
-          tags: type=semver,pattern={{major}},value=${{  steps.tagName.outputs.tag }}
+          tags: type=semver,pattern={{major}},value=${{  env.GIT_TAG_NAME }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
