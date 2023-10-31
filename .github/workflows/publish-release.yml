@@ -24,9 +24,9 @@ jobs:
         with:
             fetch-tags: true
 
-      - name: Get tag
-        id: tag
-        uses: WyriHaximus/github-action-get-previous-tag@8a0e045f02c0a3a04e1452df58b90fc7e555e950
+      - name: Get Tag
+        uses: little-core-labs/get-git-tag@v3.0.1
+        id: tagName
 
       - name: Set Node.js 16.x
         uses: actions/setup-node@v3
@@ -63,7 +63,7 @@ jobs:
           images: |
             ceisserer/neo4j-browser-withmap
             ghcr.io/${{ github.repository }}
-          tags: type=semver,pattern={{major}},value=${{ env.TAG }}
+          tags: type=semver,pattern={{major}},value=${{  steps.tagName.outputs.tag }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
