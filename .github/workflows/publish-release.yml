@@ -22,7 +22,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-            fetch-tags: true
+          fetch-tags: true
+          fetch-depth: 0
 
       - name: Get Tag
         uses: little-core-labs/get-git-tag@v3.0.1
