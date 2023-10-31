@@ -58,9 +58,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
         with:
-          images: |
-            ceisserer/neo4j-browser-withmap
-            ghcr.io/${{ github.repository }}
+          images: ceisserer/neo4j-browser-withmap
           tags: type=raw,value={{tag}}
 
       - name: Build and push Docker image
@@ -71,5 +69,5 @@ jobs:
           push: true
           tags: |
             ${{ steps.meta.outputs.tags }}
-            ''
+            '${{ secrets.DOCKER_HUB_USERNAME }}/neo4j-browser-withmap:latest'
           labels: ${{ steps.meta.outputs.labels }}
