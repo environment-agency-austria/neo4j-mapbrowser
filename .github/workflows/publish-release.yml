@@ -26,11 +26,11 @@ jobs:
           fetch-depth: 0
 
       - name: Get Tag
-        uses: olegtarasov/get-tag@v2.1.2
-        id: tagName
+        run: echo "GIT_TAG=`echo $(git describe --tags --abbrev=0)`" >> $GITHUB_ENV
+
 
       - name: Print Tag
-        run: echo "current tag is $GIT_TAG_NAME"
+        run: echo "current tag is $GIT_TAG"
 
       - name: Set Node.js 16.x
         uses: actions/setup-node@v3
@@ -67,7 +67,7 @@ jobs:
           images: |
             ceisserer/neo4j-browser-withmap
             ghcr.io/${{ github.repository }}
-          tags: type=semver,pattern={{major}},value=${{  env.GIT_TAG_NAME }}
+          tags: type=semver,pattern={{major}},value=${{  env.GIT_TAG }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
