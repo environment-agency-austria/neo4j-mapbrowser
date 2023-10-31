@@ -43,32 +43,14 @@ import { DetailsPaneProps } from './DefaultPanelContent/DefaultDetailsPane'
 import { OverviewPaneProps } from './DefaultPanelContent/DefaultOverviewPane'
 import { GraphStyleModel } from '../models/GraphStyle'
 import { GetNodeNeighboursFn, VizItem } from '../types'
-import {
-  GraphStats,
-  GraphStatsRelationshipTypes,
-  mapNodes,
-  mapRelationships
-} from '../utils/mapper'
+import { GraphStats } from '../utils/mapper'
 import { GraphModel } from '../models/Graph'
 import {
   GraphEventHandlerModel,
   GraphInteractionCallBack
 } from './Graph/GraphEventHandlerModel'
-import { GeoJsonObject, FeatureCollection } from 'geojson'
-
-import { WFS, GML } from 'ol/format'
-import GML32 from 'ol/format/GML32'
-import { GeoJSON as OLGeoJson } from 'ol/format'
-import { LineString, Point } from 'ol/geom'
-
-import { register } from 'ol/proj/proj4'
-//import * as proj4x from 'proj4'
-import VectorLayer from 'ol/layer/Vector'
-import { Feature } from 'ol'
 import { AuStyle, SyncPanel } from './SyncPanel'
-//const proj4 = (proj4x as any).default
 
-import { MapParent } from '../MapVisualizer/MapParent'
 import { convertBasicNodesToGeoNodeInfo } from '../MapVisualizer/graph_to_map'
 
 import { GeoNodeInfo } from '../MapVisualizer/types'
