@@ -5,6 +5,7 @@ name: Create and publish a Docker image
 on:
   push:
     branches: ['release']
+    tags: *
 
 env:
   REGISTRY: ghcr.io
@@ -67,7 +68,7 @@ jobs:
           images: |
             ceisserer/neo4j-browser-withmap
             ghcr.io/${{ github.repository }}
-          tags: type=semver,pattern={{major}},value=${{  env.GIT_TAG }}
+          tags: type=raw,value={{tag}}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
