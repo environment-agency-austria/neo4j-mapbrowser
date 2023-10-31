@@ -37,6 +37,9 @@ jobs:
         with:
           cmd: build
 
+      - name: Get tag
+        id: tag
+        uses: WyriHaximus/github-action-get-previous-tag@8a0e045f02c0a3a04e1452df58b90fc7e555e950
 
       - name: Log in to the Container registry
         uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
@@ -58,6 +61,7 @@ jobs:
           images: |
             ceisserer/neo4j-browser-withmap
             ghcr.io/${{ github.repository }}
+          tags: type=semver,pattern={{major}},value=${{ env.TAG }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
