@@ -69,5 +69,5 @@ jobs:
           push: true
           tags: |
             ${{ steps.meta.outputs.tags }}
-            '${{ secrets.DOCKER_HUB_USERNAME }}/neo4j-browser-withmap:latest'
+            'latest'
           labels: ${{ steps.meta.outputs.labels }}
