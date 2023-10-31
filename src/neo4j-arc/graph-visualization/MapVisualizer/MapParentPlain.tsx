@@ -9,24 +9,26 @@ import View from 'ol/View'
 import TileLayer from 'ol/layer/Tile'
 import OSM from 'ol/source/OSM'
 import TileWMS from 'ol/source/TileWMS'
-import WMSGetFeatureInfo from 'ol/format/WMSGetFeatureInfo'
 
 import * as olProj from 'ol/proj'
 import { NodeModel } from '../models/Node'
 import { VizItem } from '../types'
 import { GraphModel } from '../models/Graph'
 import { GraphEventHandlerModel } from '../GraphVisualizer/Graph/GraphEventHandlerModel'
-import { fetchFeaturesFromGmlURL } from './fetch_features'
 import { Collection, Feature } from 'ol'
 import VectorLayer from 'ol/layer/Vector'
 import VectorSource from 'ol/source/Vector'
 import { Geometry } from 'ol/geom'
-import { WFS, GeoJSON } from 'ol/format'
-import GML32 from 'ol/format/GML32'
-import { FeatureCollection } from 'geojson'
+import { GeoJSON } from 'ol/format'
 import Style from 'ol/style/Style'
 import Fill from 'ol/style/Fill'
 import Stroke from 'ol/style/Stroke'
+import {
+  IdFeaturePair,
+  getOrLoadFeaturesByURL,
+  parseGeoJson
+} from './feature_loading'
+import { getGmlUrlFromNode } from './graph_to_map'
 
 export type MapParentPlainProps = {
   mapPosition: [number, number]
@@ -37,8 +39,6 @@ export type MapParentPlainProps = {
   auStyle: 'bundeslaender' | 'bezirke' | 'gemeinden'
   syncWithGraph: boolean
 }
-
-type IdFeaturePair = { id: string; feature: Feature<Geometry> } | null
 
 function registerProjections() {
   proj4.defs(
@@ -54,73 +54,6 @@ function registerProjections() {
     '+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +towgs84=565.04,49.91,465.84,1.9848,-1.7439,9.0587,4.0772 +units=m +no_defs +type=crs'
   )
   register(proj4)
-}
-
-function getGmlUrlFromNode(node: NodeModel) {
-  return node.propertyList.find(p => p.key === 'gml:identifer')?.value
-}
-
-// asynchronously loads a single feature
-async function loadFeature(
-  gmlUri: string,
-  targetProjection: olProj.Projection
-): Promise<IdFeaturePair> {
-  if (gmlUri) {
-    const selIdWithFormat = gmlUri + '?outputFormat=application/json'
-    const fetchPromise = fetch(selIdWithFormat)
-      .then(response => response.text())
-      .then(txt => {
-        const featureCollection = new GeoJSON().readFeatures(txt, {
-          dataProjection: 'EPSG:3035',
-          featureProjection: targetProjection
-        })
-        return { id: gmlUri, feature: featureCollection[0] }
-      })
-
-    // @ts-ignore
-    return fetchPromise
-  } else {
-    return Promise.resolve(null)
-  }
-}
-
-function loadUncachedFeatures(
-  cache: Map<string, Feature<Geometry> | null>,
-  gmlUris: string[],
-  targetProjection: olProj.Projection,
-  featureLoadedCB: (ft: IdFeaturePair) => void
-) {
-  // considere only features not already contained in the cache
-  const allLoads = gmlUris.filter(uri => !cache.has(uri))
-  const pendingLoads = new Set<string>(allLoads)
-  // mark all non-existent urls as currently loading (feature = null)
-  // so no futher attempts are made to load this multiple times
-  allLoads.forEach(uri => cache.set(uri, null))
-
-  function loadUri(uri: string): Promise<any> {
-    pendingLoads.delete(uri)
-    const featurePromise = loadFeature(uri, targetProjection)
-    return featurePromise.then(ft => {
-      if (ft) {
-        cache.set(uri, ft.feature)
-        featureLoadedCB(ft)
-      }
-
-      if (pendingLoads.size > 0) {
-        return loadUri(pendingLoads.values().next().value)
-      } else {
-        return ft
-      }
-    })
-  }
-
-  // Fetch the first PARALLEL_FETCH_COUNT requests, once finished each request
-  // will begin to initiate another fetch again until all open requests (pendingLoads)
-  // are fulfilled.
-  const PARALLEL_FETCH_COUNT = 10
-  for (let i = 0; i < Math.min(PARALLEL_FETCH_COUNT, allLoads.length); i++) {
-    loadUri(allLoads[i])
-  }
 }
 
 export function MapParentPlain(props: MapParentPlainProps) {
@@ -146,7 +79,7 @@ export function MapParentPlain(props: MapParentPlainProps) {
     const gmlUri = getGmlUrlFromNode(props.selectedItem.item as NodeModel)
 
     if (gmlUri) {
-      loadUncachedFeatures(
+      getOrLoadFeaturesByURL(
         featureCache.current,
         [gmlUri],
         map.getView().getProjection(),
@@ -181,7 +114,7 @@ export function MapParentPlain(props: MapParentPlainProps) {
       .map(n => ({ url: n.propertyMap['gml:identifier'], layers: n.labels }))
 
     //make sure all features are loaded into cache
-    loadUncachedFeatures(
+    getOrLoadFeaturesByURL(
       featureCache.current,
       nodeURLs.map(nu => nu.url),
       map.getView().getProjection(),
@@ -299,17 +232,24 @@ export function MapParentPlain(props: MapParentPlainProps) {
             viewResolution,
             map.getView().getProjection(),
             {
-              INFO_FORMAT: 'text/plain'
+              INFO_FORMAT: 'application/json'
             }
           )
         if (url) {
           fetch(url)
             .then(response => response.text())
             .then(txt => {
-              const idPos = txt.indexOf('id=') + 3
-              const startTrimmed = txt.substring(idPos)
-              const id = startTrimmed.substring(0, startTrimmed.indexOf('>'))
-              selectNodeById(id)
+              const featureCollection = parseGeoJson(
+                txt,
+                map.getView().getProjection()
+              )
+              const feature = featureCollection[0]
+              if (feature) {
+                const url = feature.get('gml:identiifer')
+                const id = feature.get('gml:id')
+                featureCache.current.set(url, feature)
+                selectNodeById(id)
+              }
             })
         }
       } else {
@@ -367,7 +307,7 @@ export function MapParentPlain(props: MapParentPlainProps) {
       } else {
         psLayer.current = new TileLayer({
           source: new TileWMS({
-            url: 'https://geoserver2-admin.rest-gdi.geo-data.space/geoserver/ps/wms?service=WMS',
+            url: 'https://geoserver-admin.rest-gdi.geo-data.space/geoserver/ps/wms?service=WMS',
             params: {
               LAYERS: 'ps:ProtectedSite',
               TILED: true,

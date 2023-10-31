@@ -1,9 +1,7 @@
-import { BasicNode, BasicNodesAndRels } from '../../common/types/arcTypes'
+import { BasicNodesAndRels } from '../../common/types/arcTypes'
 import { GraphModel } from '../models/Graph'
 import { GraphEventHandlerModel } from '../GraphVisualizer/Graph/GraphEventHandlerModel'
 import { mapNodes, mapRelationships } from '../utils/mapper'
-import * as olProj from 'ol/proj'
-import { GeoNodeInfo } from './types'
 
 function setGraphNodes(
   newNodesAndRels: BasicNodesAndRels,
@@ -45,7 +43,7 @@ function setGraphNodes(
 }
 
 function generateNodeBoundsQuery(bounds: any) {
-  const southWestTrx = [bounds[2], bounds[3]] //olProj.fromLonLat([bounds[0], bounds[1]], 'EPSG:31287');
+  const southWestTrx = [bounds[2], bounds[3]]
   const northEastTrx = [bounds[0], bounds[1]] //olProj.fromLonLat([bounds[2], bounds[3]], 'EPSG:31287');
 
   const query =
@@ -61,13 +59,16 @@ function generateNodeBoundsQuery(bounds: any) {
     ' OPTIONAL MATCH (n)-[r]-(m) return n, r, m;'
 
   /*
-  const query =
-    'MATCH(n) WHERE ' +
-    '     toFloat(n.x_max) <= ' + southWestTrx[0] +
-    ' AND toFloat(n.y_max) <= ' + southWestTrx[1] +
-    ' AND toFloat(n.x_min) >= ' + northEastTrx[0] +
-    ' AND toFloat(n.y_min) >= ' + northEastTrx[1] +
-    ' MATCH path = (n)--() return path;'*/
+        ' MATCH(m) WHERE ' +
+    '     m.x_max >= ' +
+    northEastTrx[0] +
+    ' AND m.y_max >= ' +
+    northEastTrx[1] +
+    ' AND m.x_min <= ' +
+    southWestTrx[0] +
+    ' AND m.y_min <= ' +
+    southWestTrx[1] +
+    */
 
   return query
 }
