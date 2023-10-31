@@ -4,9 +4,8 @@ name: Create and publish a Docker image
 # Configures this workflow to run every time a change is pushed to the branch called `release`.
 on:
   push:
-    branches: ['release']
     tags:
-        - '*'
+    - '*'
 
 env:
   REGISTRY: ghcr.io
@@ -26,13 +25,6 @@ jobs:
         with:
           fetch-tags: true
           fetch-depth: 0
-
-      - name: Get Tag
-        run: echo "GIT_TAG=`echo $(git describe --tags --abbrev=0)`" >> $GITHUB_ENV
-
-
-      - name: Print Tag
-        run: echo "current tag is $GIT_TAG"
 
       - name: Set Node.js 16.x
         uses: actions/setup-node@v3
