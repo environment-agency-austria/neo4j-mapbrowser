@@ -21,6 +21,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+            fetch-tags: true
+
+      - name: Get tag
+        id: tag
+        uses: WyriHaximus/github-action-get-previous-tag@8a0e045f02c0a3a04e1452df58b90fc7e555e950
 
       - name: Set Node.js 16.x
         uses: actions/setup-node@v3
@@ -36,10 +42,6 @@ jobs:
         uses: borales/actions-yarn@v4
         with:
           cmd: build
-
-      - name: Get tag
-        id: tag
-        uses: WyriHaximus/github-action-get-previous-tag@8a0e045f02c0a3a04e1452df58b90fc7e555e950
 
       - name: Log in to the Container registry
         uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
