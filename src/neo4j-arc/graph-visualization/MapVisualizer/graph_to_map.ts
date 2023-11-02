@@ -3,6 +3,23 @@ import { GeoNodeInfo } from './types'
 import { VizItem } from '../types'
 import * as olProj from 'ol/proj'
 import { NodeModel } from '../models/Node'
+import { GraphModel } from '../models/Graph'
+
+type UrlLayerPair = {
+  url: string
+  layers: string[]
+}
+
+function getGmlUrlsFromNodes(graph: GraphModel): UrlLayerPair[] {
+  return graph
+    .nodes()
+    .filter(n => n.propertyMap['gml:identifier'])
+    .map(n => ({ url: n.propertyMap['gml:identifier'], layers: n.labels }))
+}
+
+function getGmlUrlFromNode(node: NodeModel) {
+  return node.propertyList.find(p => p.key === 'gml:identifer')?.value
+}
 
 function convertBasicNodesToGeoNodeInfo(nodes: BasicNode[]): GeoNodeInfo[] {
   const containedURLs = new Set<string>()
@@ -24,8 +41,9 @@ function convertBasicNodesToGeoNodeInfo(nodes: BasicNode[]): GeoNodeInfo[] {
   //.filter(node => node.labels.filter(l => selectedLayers.includes(l)).length > 0)
 }
 
-function getGmlUrlFromNode(node: NodeModel) {
-  return node.propertyList.find(p => p.key === 'gml:identifer')?.value
+export {
+  UrlLayerPair,
+  convertBasicNodesToGeoNodeInfo,
+  getGmlUrlFromNode,
+  getGmlUrlsFromNodes
 }
-
-export { convertBasicNodesToGeoNodeInfo, getGmlUrlFromNode }

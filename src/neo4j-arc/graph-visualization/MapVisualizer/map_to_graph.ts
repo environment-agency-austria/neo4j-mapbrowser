@@ -2,6 +2,9 @@ import { BasicNodesAndRels } from '../../common/types/arcTypes'
 import { GraphModel } from '../models/Graph'
 import { GraphEventHandlerModel } from '../GraphVisualizer/Graph/GraphEventHandlerModel'
 import { mapNodes, mapRelationships } from '../utils/mapper'
+import { Feature } from 'ol'
+import { Geometry } from 'ol/geom'
+import { FeatureLike } from 'ol/Feature'
 
 function setGraphNodes(
   newNodesAndRels: BasicNodesAndRels,
@@ -42,6 +45,39 @@ function setGraphNodes(
   }
 }
 
+function getNodeById(selid: string, graph: GraphModel) {
+  return graph
+    .nodes()
+    .find(n =>
+      n.propertyList.find(p => p.key === 'gml:id' && p.value === selid)
+    )
+}
+
+function selectNodeById(
+  selid?: string,
+  graph?: GraphModel,
+  geh?: GraphEventHandlerModel
+) {
+  if (graph && geh) {
+    if (selid) {
+      const selectedNode = getNodeById(selid, graph)
+
+      if (selectedNode) {
+        geh.selectItem(selectedNode)
+        geh.onItemSelected({
+          type: 'node',
+          item: selectedNode
+        })
+
+        return selectedNode
+      }
+    }
+    //TODO: Implement reseting selection
+  }
+
+  return
+}
+
 function generateNodeBoundsQuery(bounds: any) {
   const southWestTrx = [bounds[2], bounds[3]]
   const northEastTrx = [bounds[0], bounds[1]] //olProj.fromLonLat([bounds[2], bounds[3]], 'EPSG:31287');
@@ -73,4 +109,4 @@ function generateNodeBoundsQuery(bounds: any) {
   return query
 }
 
-export { setGraphNodes, generateNodeBoundsQuery }
+export { setGraphNodes, generateNodeBoundsQuery, getNodeById, selectNodeById }
