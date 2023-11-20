@@ -52,7 +52,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
         with:
-          images: https://ghcr.io/ceisserer/neo4j-mapbrowser
+          images: ghcr.io/${{ github.repository }}
           tags: |
                   type=raw,value={{tag}}
                   type=raw,value=latest
