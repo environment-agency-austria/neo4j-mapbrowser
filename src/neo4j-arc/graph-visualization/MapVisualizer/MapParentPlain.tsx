@@ -203,6 +203,28 @@ export function MapParentPlain(props: MapParentPlainProps) {
     }
   }, [props.syncWithGraph, props.syncGraphWithMap, map])
 
+  useEffect(() => {
+    const selItem = currentProps.current.selectedItem
+    if (map && selItem && selItem.type === 'node') {
+      const node = selItem.item as NodeModel
+      const bbox = [
+        parseInt(node.propertyMap['x_min']),
+        parseInt(node.propertyMap['y_min']),
+        parseInt(node.propertyMap['x_max']),
+        parseInt(node.propertyMap['y_max'])
+      ]
+      const center = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2]
+
+      const centerView = olProj.transform(
+        center,
+        'EPSG:3035',
+        map.getView().getProjection()
+      )
+
+      map.getView().setCenter(centerView)
+    }
+  }, [props.syncWithGraph, props.syncGraphWithMap, props.selectedItem])
+
   return (
     <>
       <div
