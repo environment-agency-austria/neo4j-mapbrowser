@@ -226,5 +226,6 @@ export {
   createSelectLayer,
   handleSelectClick,
   syncSelectLayer,
+  closeSelectionPopup,
   FeatureSelectListener
 }

@@ -39,7 +39,8 @@ import {
   SelectLayerContent,
   handleSelectClick,
   syncSelectLayer,
-  FeatureSelectListener
+  FeatureSelectListener,
+  closeSelectionPopup
 } from './SelectLayer'
 import { selectNodeById } from './map_to_graph'
 import { RelationshipModel } from '../models/Relationship'
@@ -97,6 +98,12 @@ export function MapParentPlain(props: MapParentPlainProps) {
       )
     }
   }
+
+  useEffect(() => {
+    if (lastMapSelectedNode.current !== props.selectedItem.item && map) {
+      closeSelectionPopup(map)
+    }
+  }, [props.selectedItem])
 
   useEffect(() => {
     const view = new View({
