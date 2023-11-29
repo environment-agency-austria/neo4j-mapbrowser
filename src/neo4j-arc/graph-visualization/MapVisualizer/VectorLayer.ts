@@ -52,11 +52,12 @@ function syncVectorLayer(
   map: OLMap,
   featureCache: Map<string, Feature<Geometry> | null>,
   content: VectorLayerContent,
+  syncWithGraph: boolean,
   forceUpdate: () => void,
   graph?: GraphModel
 ) {
   // vector nodes handling
-  if (graph) {
+  if (graph && syncWithGraph) {
     const nodeURLs = getGmlUrlsFromNodes(graph)
     getOrLoadFeaturesByURL(
       featureCache,
@@ -124,4 +125,9 @@ function createVectorLayer(featureColl: Collection<Feature<Geometry>>) {
   return vectorLayer
 }
 
-export { VectorLayerContent, createVectorLayer, syncVectorLayer }
+export {
+  VectorLayerContent,
+  createVectorLayer,
+  syncVectorLayer,
+  clearVectorLayerContent
+}

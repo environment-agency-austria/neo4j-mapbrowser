@@ -32,7 +32,8 @@ import { getGmlUrlFromNode, getGmlUrlsFromNodes } from './graph_to_map'
 import {
   createVectorLayer,
   VectorLayerContent,
-  syncVectorLayer
+  syncVectorLayer,
+  clearVectorLayerContent
 } from './VectorLayer'
 import {
   createSelectLayer,
@@ -88,15 +89,14 @@ export function MapParentPlain(props: MapParentPlainProps) {
       forceUpdate,
       props.selectedItem
     )
-    if (props.syncWithGraph) {
-      syncVectorLayer(
-        map,
-        featureCache.current,
-        visibleFeatures.current,
-        forceUpdate,
-        props.graph
-      )
-    }
+    syncVectorLayer(
+      map,
+      featureCache.current,
+      visibleFeatures.current,
+      props.syncWithGraph,
+      forceUpdate,
+      props.graph
+    )
   }
 
   useEffect(() => {
