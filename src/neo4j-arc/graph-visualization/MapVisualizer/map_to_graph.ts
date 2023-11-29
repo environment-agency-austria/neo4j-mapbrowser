@@ -5,6 +5,7 @@ import { mapNodes, mapRelationships } from '../utils/mapper'
 import { Feature } from 'ol'
 import { Geometry } from 'ol/geom'
 import { FeatureLike } from 'ol/Feature'
+import { NodeModel } from '../models/Node'
 
 function setGraphNodes(
   newNodesAndRels: BasicNodesAndRels,

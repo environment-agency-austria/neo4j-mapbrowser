@@ -242,6 +242,7 @@ export class GraphVisualizer extends Component<
 
   onItemMouseOver(item: VizItem): void {
     this.setHoveredItem(item)
+    // this.setState({ selectedItem : item })
   }
 
   mounted = true

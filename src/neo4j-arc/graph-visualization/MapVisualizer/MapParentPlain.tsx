@@ -38,9 +38,11 @@ import {
   createSelectLayer,
   SelectLayerContent,
   handleSelectClick,
-  syncSelectLayer
+  syncSelectLayer,
+  FeatureSelectListener
 } from './SelectLayer'
 import { selectNodeById } from './map_to_graph'
+import { RelationshipModel } from '../models/Relationship'
 
 export type MapParentPlainProps = {
   mapPosition: [number, number]
@@ -73,6 +75,8 @@ export function MapParentPlain(props: MapParentPlainProps) {
   const mapTargetElement = useRef<HTMLDivElement>(null)
   const [map, setMap] = useState<OLMap | undefined>()
   const [auLayer, setAuLayer] = useState<TileLayer<TileWMS> | undefined>()
+
+  const lastMapSelectedNode = useRef<NodeModel | null>(null)
 
   // sync react props with map state (visible features & selection)
   if (map) {
@@ -134,6 +138,11 @@ export function MapParentPlain(props: MapParentPlainProps) {
 
     map.on('singleclick', e => {
       if (currentProps.current.graph && currentProps.current.geh) {
+        const featureSelected = (node: NodeModel) => {
+          lastMapSelectedNode.current = node
+          forceUpdate()
+        }
+
         handleSelectClick(
           e,
           featureCache.current,
@@ -141,7 +150,8 @@ export function MapParentPlain(props: MapParentPlainProps) {
           forceUpdate,
           vectorLayer,
           currentProps.current.graph,
-          currentProps.current.geh
+          currentProps.current.geh,
+          featureSelected
         )
       }
     })
@@ -207,21 +217,24 @@ export function MapParentPlain(props: MapParentPlainProps) {
     const selItem = currentProps.current.selectedItem
     if (map && selItem && selItem.type === 'node') {
       const node = selItem.item as NodeModel
-      const bbox = [
-        parseInt(node.propertyMap['x_min']),
-        parseInt(node.propertyMap['y_min']),
-        parseInt(node.propertyMap['x_max']),
-        parseInt(node.propertyMap['y_max'])
-      ]
-      const center = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2]
 
-      const centerView = olProj.transform(
-        center,
-        'EPSG:3035',
-        map.getView().getProjection()
-      )
+      if (node !== lastMapSelectedNode.current) {
+        const bbox = [
+          parseInt(node.propertyMap['x_min']),
+          parseInt(node.propertyMap['y_min']),
+          parseInt(node.propertyMap['x_max']),
+          parseInt(node.propertyMap['y_max'])
+        ]
+        const center = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2]
 
-      map.getView().setCenter(centerView)
+        const centerView = olProj.transform(
+          center,
+          'EPSG:3035',
+          map.getView().getProjection()
+        )
+
+        map.getView().setCenter(centerView)
+      }
     }
   }, [props.syncWithGraph, props.syncGraphWithMap, props.selectedItem])
 

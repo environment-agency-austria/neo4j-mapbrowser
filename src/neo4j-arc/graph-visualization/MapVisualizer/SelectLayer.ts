@@ -25,6 +25,8 @@ import { VizItem } from '../types'
 import { getGmlUrlFromNode } from './graph_to_map'
 import { Coordinate } from 'ol/coordinate'
 
+type FeatureSelectListener = (node: NodeModel) => void
+
 type SelectLayerContent = {
   selectedFeature: IdFeaturePair | null
   selectedFeatureCollection: Collection<Feature<Geometry>>
@@ -36,12 +38,14 @@ function closeSelectionPopup(map: OLMap) {
 
 function selectSingleNode(
   selid: string,
-  forceUpdate: () => void,
   graph: GraphModel,
-  geh: GraphEventHandlerModel
+  geh: GraphEventHandlerModel,
+  featureListener: FeatureSelectListener
 ) {
-  if (selectNodeById(selid, graph, geh)) {
-    forceUpdate()
+  const node = selectNodeById(selid, graph, geh)
+  if (node) {
+    featureListener(node)
+    //forceUpdate()
   }
 }
 
@@ -51,7 +55,8 @@ function displaySelectedNodeChooser(
   nodeIDs: string[],
   forceUpdate: () => void,
   graph: GraphModel,
-  geh: GraphEventHandlerModel
+  geh: GraphEventHandlerModel,
+  featureListener: FeatureSelectListener
 ) {
   if (nodeIDs.length > 1) {
     const content = document.createElement('ol') as HTMLOListElement
@@ -62,7 +67,7 @@ function displaySelectedNodeChooser(
       li.innerText = nodeIDs[i]
       content.appendChild(li)
       li.onmouseover = () =>
-        selectSingleNode(li.innerText, forceUpdate, graph, geh)
+        selectSingleNode(li.innerText, graph, geh, featureListener)
       li.onclick = () => closeSelectionPopup(map)
     }
 
@@ -74,7 +79,7 @@ function displaySelectedNodeChooser(
     })
     map.addOverlay(ov)
   } else if (nodeIDs.length == 1) {
-    selectSingleNode(nodeIDs[0], forceUpdate, graph, geh)
+    selectSingleNode(nodeIDs[0], graph, geh, featureListener)
   } else {
     //TODO: Clear selection
     forceUpdate()
@@ -88,7 +93,8 @@ function handleSelectClick(
   forceUpdate: () => void,
   vectorLayer: VectorLayer<any>,
   graph: GraphModel,
-  geh: GraphEventHandlerModel
+  geh: GraphEventHandlerModel,
+  featureListener: FeatureSelectListener
 ) {
   const viewResolution = e.map.getView().getResolution() ?? 0
 
@@ -126,7 +132,8 @@ function handleSelectClick(
             nodeIds,
             forceUpdate,
             graph,
-            geh
+            geh,
+            featureListener
           )
         })
     }
@@ -145,7 +152,8 @@ function handleSelectClick(
       vectorIds,
       forceUpdate,
       graph,
-      geh
+      geh,
+      featureListener
     )
   }
 }
@@ -217,5 +225,6 @@ export {
   SelectLayerContent,
   createSelectLayer,
   handleSelectClick,
-  syncSelectLayer
+  syncSelectLayer,
+  FeatureSelectListener
 }
