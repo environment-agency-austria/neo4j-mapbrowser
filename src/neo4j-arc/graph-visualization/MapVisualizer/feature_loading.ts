@@ -42,6 +42,9 @@ async function loadFeature(
       .then(response => response.text())
       .then(txt => {
         const featureCollection = parseGeoJson(txt, targetProjection)
+        /*if(featureCollection.length > 0 && featureCollection[0].getId()) {
+          console.log("feature " +selIdWithFormat+ " loaded: " + featureCollection[0].getId())
+        }*/
         return { id: gmlUri, feature: featureCollection[0] }
       })
 

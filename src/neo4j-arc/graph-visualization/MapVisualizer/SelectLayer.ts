@@ -19,7 +19,7 @@ import { Graph } from '../GraphVisualizer/Graph/Graph'
 import { GraphEventHandlerModel } from '../GraphVisualizer/Graph/GraphEventHandlerModel'
 import { selectNodeById } from './map_to_graph'
 import { GraphModel } from '../models/Graph'
-import { DispatchWithoutAction } from 'react'
+import { DispatchWithoutAction, MutableRefObject } from 'react'
 import { NodeModel } from '../models/Node'
 import { VizItem } from '../types'
 import { getGmlUrlFromNode } from './graph_to_map'
@@ -61,13 +61,21 @@ function displaySelectedNodeChooser(
   if (nodeIDs.length > 1) {
     const content = document.createElement('ol') as HTMLOListElement
     content.style.background = 'rgba(255,255,255,0.75)'
+
+    const liElems: Array<HTMLElement> = []
     for (let i = 0; i < nodeIDs.length; i++) {
+      const nodeId = nodeIDs[i]
       const li = document.createElement('li')
+      liElems.push(li)
       li.style.cursor = 'pointer'
-      li.innerText = nodeIDs[i]
+
+      li.innerText = nodeId
       content.appendChild(li)
-      li.onmouseover = () =>
+      li.onmouseover = () => {
         selectSingleNode(li.innerText, graph, geh, featureListener)
+        liElems.forEach(l => (l.style.fontWeight = ''))
+        li.style.fontWeight = 'bold'
+      }
       li.onclick = () => closeSelectionPopup(map)
     }
 
