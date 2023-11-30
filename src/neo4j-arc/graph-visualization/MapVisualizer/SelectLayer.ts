@@ -129,7 +129,7 @@ function handleSelectClick(
             e.map.getView().getProjection()
           )
           featureCollection.forEach(ft => {
-            const url = ft.get('gml:identiifer')
+            const url = ft.get('gml:identifier')
             featureCache.set(url, ft)
           })
 
