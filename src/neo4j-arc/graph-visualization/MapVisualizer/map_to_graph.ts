@@ -6,6 +6,7 @@ import { Feature } from 'ol'
 import { Geometry } from 'ol/geom'
 import { FeatureLike } from 'ol/Feature'
 import { NodeModel } from '../models/Node'
+import { GML_IDENTIFIER_KEY } from '../config'
 
 function setGraphNodes(
   newNodesAndRels: BasicNodesAndRels,
@@ -50,7 +51,9 @@ function getNodeById(selid: string, graph: GraphModel) {
   return graph
     .nodes()
     .find(n =>
-      n.propertyList.find(p => p.key === 'gml:id' && p.value === selid)
+      n.propertyList.find(
+        p => p.key === GML_IDENTIFIER_KEY && p.value === selid
+      )
     )
 }
 
@@ -79,12 +82,12 @@ function selectNodeById(
   return
 }
 
-function generateNodeBoundsQuery(bounds: any) {
-  const southWestTrx = [bounds[2], bounds[3]]
-  const northEastTrx = [bounds[0], bounds[1]] //olProj.fromLonLat([bounds[2], bounds[3]], 'EPSG:31287');
+export function getNodeBoundingBoxFilter(bounds: any) {
+  //olProj.fromLonLat([bounds[2], bounds[3]], 'EPSG:31287');
 
-  const query =
-    'MATCH(n:Schutzgebiet) WHERE ' +
+  const southWestTrx = [bounds[2], bounds[3]]
+  const northEastTrx = [bounds[0], bounds[1]]
+  return (
     '     n.x_max >= ' +
     northEastTrx[0] +
     ' AND n.y_max >= ' +
@@ -92,8 +95,53 @@ function generateNodeBoundsQuery(bounds: any) {
     ' AND n.x_min <= ' +
     southWestTrx[0] +
     ' AND n.y_min <= ' +
-    southWestTrx[1] +
-    ' OPTIONAL MATCH (n)-[r]-(m) return n, r, m;'
+    southWestTrx[1]
+  )
+}
+
+export function appendBoundindBoxFilterToQuery(
+  bounds: any,
+  originalQuery: string,
+  versionId?: string
+) {
+  const returnPosition = originalQuery.indexOf('return')
+  const originalQueryWithoutReturn = originalQuery.substring(0, returnPosition)
+  let bboxAppended =
+    originalQueryWithoutReturn +
+    'WITH n WHERE' +
+    getNodeBoundingBoxFilter(bounds)
+  if (versionId && versionId.length > 0) {
+    bboxAppended += ` AND n.versionId="${versionId}"`
+  }
+  bboxAppended += ' return n limit 300;'
+  return bboxAppended
+}
+
+export function generateNodeBoundsQuery(bounds: any, versionId: string) {
+  console.log(versionId)
+
+  // const query =
+  //   'MATCH(n:FT_Invekos_Flurstuecke) WHERE ' +
+  //   ` point.withinBBox(n.min, point({x: ${northEastTrx[0]}, y: ${northEastTrx[1]}, crs:"cartesian"}), point({x: ${southWestTrx[0]}, y: ${southWestTrx[1]}, crs:"cartesian"}))  ` +
+  //   " OR " +
+  //   ` point.withinBBox(n.max, point({x: ${northEastTrx[0]}, y: ${northEastTrx[1]}, crs:"cartesian"}), point({x: ${southWestTrx[0]}, y: ${southWestTrx[1]}, crs:"cartesian"}))  ` +
+  //   'WITH n MATCH (n)-[v:Foerderprogramm]->(x:FT_Invekos_Flurstuecke_Version{foerderart : "MFA2024"})' +
+  //   ' OPTIONAL MATCH (n)-[r]-(m) return n, r, mf';
+
+  let query =
+    `MATCH(n:FT_Invekos_Schlaege_Version) WHERE ` +
+    getNodeBoundingBoxFilter(bounds)
+  if (versionId && versionId.length > 0) {
+    query += ` AND n.versionId="${versionId}"`
+  }
+  query += ' return n limit 300'
+
+  // ' WITH n MATCH (x)-[v:Foerderprogramm]->(n)' +
+  // '  return n, v, x ';
+
+  //OPTIONAL MATCH (n)-[r]-(m{foerderart : "MFA2024"})
+
+  console.log(query)
 
   /*
         ' MATCH(m) WHERE ' +
@@ -110,4 +158,4 @@ function generateNodeBoundsQuery(bounds: any) {
   return query
 }
 
-export { setGraphNodes, generateNodeBoundsQuery, getNodeById, selectNodeById }
+export { setGraphNodes, getNodeById, selectNodeById }

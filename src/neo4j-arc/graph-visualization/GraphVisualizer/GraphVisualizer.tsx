@@ -51,14 +51,19 @@ import {
 } from './Graph/GraphEventHandlerModel'
 import { AuStyle, SyncPanel } from './SyncPanel'
 
-import { convertBasicNodesToGeoNodeInfo } from '../MapVisualizer/graph_to_map'
+import {
+  convertBasicNodesToGeoNodeInfo,
+  getGmlUrlsFromNodes
+} from '../MapVisualizer/graph_to_map'
 
 import { GeoNodeInfo } from '../MapVisualizer/types'
 import {
+  appendBoundindBoxFilterToQuery,
   generateNodeBoundsQuery,
   setGraphNodes
 } from '../MapVisualizer/map_to_graph'
 import { MapParentPlain } from '../MapVisualizer/MapParentPlain'
+import { GML_IDENTIFIER_KEY, VERSIONIDS, WKT_KEY } from '../config'
 
 const DEFAULT_MAX_NEIGHBOURS = 100
 
@@ -108,6 +113,7 @@ type GraphVisualizerProps = GraphVisualizerDefaultProps & {
   onGraphInteraction?: GraphInteractionCallBack
   useGeneratedDefaultColors?: boolean
   autocompleteRelationships: boolean
+  originalQuery: string
 }
 
 type GraphVisualizerState = {
@@ -130,6 +136,8 @@ type GraphVisualizerState = {
   mapPosition: [number, number]
   syncWithMap: boolean
   syncWithGraph: boolean
+  limitGraphToMapBounds: boolean
+  versionId: string
   bounds: any
   zoom: number
 }
@@ -139,6 +147,7 @@ export class GraphVisualizer extends Component<
   GraphVisualizerState
 > {
   defaultStyle: any
+  queryQueue: string[] = []
 
   static defaultProps: GraphVisualizerDefaultProps = {
     maxNeighbours: DEFAULT_MAX_NEIGHBOURS,
@@ -201,14 +210,16 @@ export class GraphVisualizer extends Component<
       width: defaultPanelWidth(),
       nodePropertiesExpanded: nodePropertiesExpandedByDefault,
       mapPosition: [4571802.512166972, 2727798.8987145913],
-      syncWithMap: true,
-      syncWithGraph: false,
+      syncWithMap: false,
+      syncWithGraph: true,
+      limitGraphToMapBounds: true,
       bounds: null,
       zoom: 8,
       nodeURLs: [],
       hiddenLayers: [],
       loadedLayers: [],
-      layer: 'gemeinden'
+      layer: 'gemeinden',
+      versionId: VERSIONIDS[VERSIONIDS.length - 1]
     }
   }
 
@@ -300,7 +311,11 @@ export class GraphVisualizer extends Component<
     this.geh = handler
   }
 
-  syncOptionsChanged = (syncWithMapBound: boolean, syncWithGraph: boolean) => {
+  syncOptionsChanged = (
+    syncWithMapBound: boolean,
+    syncWithGraph: boolean,
+    limitGraphToMapBounds: boolean
+  ) => {
     if (syncWithMapBound && this.state.mapGraph) {
       //restore graph based on what was fetched for map before
       setGraphNodes(this.state.mapGraph, this.g, this.geh)
@@ -313,24 +328,12 @@ export class GraphVisualizer extends Component<
     this.setState(prev => ({
       ...prev,
       syncWithMap: syncWithMapBound,
-      syncWithGraph: syncWithGraph
+      syncWithGraph: syncWithGraph,
+      limitGraphToMapBounds: limitGraphToMapBounds
     }))
   }
 
-  syncGraphWithMap = (zoom: number, zoomDetailLevel: number, bounds: any) => {
-    if (!this.state.syncWithMap) {
-      return
-    }
-
-    //console.log(zoom + zoomDetailLevel)
-
-    // wenn grob, keine Daten laden (nur für getFeatureInfo)
-    if (zoom < zoomDetailLevel) {
-      setGraphNodes({ nodes: [], relationships: [] }, this.g, this.geh)
-      return
-    }
-
-    const query = generateNodeBoundsQuery(bounds)
+  executeQuery = (query: string, queryExecuted: () => void) => {
     console.log(query)
     this.props.updateQuery?.(query).then(resultGraph => {
       const nodeInfo = convertBasicNodesToGeoNodeInfo(resultGraph.nodes)
@@ -346,22 +349,71 @@ export class GraphVisualizer extends Component<
       })
 
       console.log('number of nodes returned: ' + resultGraph.nodes.length)
-      if (this.state.syncWithMap) {
+      if (this.state.syncWithMap || this.state.limitGraphToMapBounds) {
         setGraphNodes(resultGraph, this.g, this.geh)
       }
+
+      queryExecuted()
     })
+  }
+
+  //TODO: Implement queue with pending queries, when a query is done, execute only the most recent one
+  executeQueryBuffered(query: string) {
+    const queryQueue = this.queryQueue
+    queryQueue.push(query)
+    if (queryQueue.length === 1) {
+      this.executeQuery(query, () => {
+        const lastQuery = queryQueue[queryQueue.length - 1]
+        queryQueue.length = 0
+        if (lastQuery !== query) {
+          this.executeQueryBuffered(lastQuery)
+        }
+      })
+    }
+  }
+
+  syncGraphWithMap = (
+    zoom: number,
+    zoomDetailLevel: number,
+    bounds: any,
+    versionId: string
+  ) => {
+    //console.log(zoom + zoomDetailLevel)
+
+    // wenn grob, keine Daten laden (nur für getFeatureInfo)
+    // if (zoom < zoomDetailLevel && !this.state.limitGraphToMapBounds) {
+    //   setGraphNodes({ nodes: [], relationships: [] }, this.g, this.geh)
+    //   return
+    // }
+    console.log(zoom + ' ' + zoomDetailLevel)
+
+    let query: string
+    if (this.state.syncWithMap) {
+      query = generateNodeBoundsQuery(bounds, versionId)
+    } else {
+      query = appendBoundindBoxFilterToQuery(
+        bounds,
+        this.props.originalQuery,
+        versionId
+      )
+    }
+    // if(this.state.limitGraphToMapBounds) {
+    //   query = appendBoundindBoxFilterToQuery(bounds, this.props.originalQuery);
+    // } else {
+    //   query = generateNodeBoundsQuery(bounds, versionId);
+    // }
+
+    this.executeQueryBuffered(query)
   }
 
   syncMapWithGraph = () => {
     if (this.g) {
       console.log('nodes there: ' + this.g?.nodes().length)
 
-      const urlList = this.g
-        ?.nodes()
-        .filter(n => n.propertyMap['gml:identifier'])
-        .map(n => ({ url: n.propertyMap['gml:identifier'], layers: n.labels }))
-
+      //TODO: extremly expensive just for change detection!
+      const urlList = getGmlUrlsFromNodes(this.g)
       if (JSON.stringify(urlList) !== JSON.stringify(this.state.nodeURLs)) {
+        // data is actually not used, just set to trigger refresh
         this.setState({ nodeURLs: urlList })
       }
     }
@@ -374,6 +426,12 @@ export class GraphVisualizer extends Component<
   visibleLayersChanged = (layer: AuStyle) => {
     if (this.state.layer !== layer) {
       this.setState({ layer: layer })
+    }
+  }
+
+  versionIdChanged = (versionId: string) => {
+    if (this.state.versionId !== versionId) {
+      this.setState({ versionId: versionId })
     }
   }
 
@@ -411,13 +469,15 @@ export class GraphVisualizer extends Component<
 
     return (
       <StyledFullSizeContainer id="svg-vis">
-        <div style={{ position: 'absolute', top: '30px', zIndex: 1000 }}>
+        <div style={{ position: 'absolute', top: '30px', zIndex: 10 }}>
           <SyncPanel
             syncWithMapBounds={this.state.syncWithMap}
             syncWithGraph={this.state.syncWithGraph}
+            limitGraphToMapBounds={this.state.limitGraphToMapBounds}
             syncOptionsChanged={this.syncOptionsChanged}
-            layers={this.state.loadedLayers}
-            layerChanged={this.visibleLayersChanged}
+            // layers={this.state.loadedLayers}
+            bgLayerChanged={this.visibleLayersChanged}
+            versionChanged={this.versionIdChanged}
           />
         </div>
 
@@ -454,6 +514,9 @@ export class GraphVisualizer extends Component<
           auStyle={this.state.layer ?? 'gemeinden'}
           syncGraphWithMap={this.syncGraphWithMap}
           syncWithGraph={this.state.syncWithGraph}
+          limitGraphToMapBounds={this.state.limitGraphToMapBounds}
+          syncWithMap={this.state.syncWithMap}
+          versionId={this.state.versionId}
         ></MapParentPlain>
 
         <NodeInspectorPanel

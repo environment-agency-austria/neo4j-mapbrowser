@@ -17,22 +17,39 @@ import { Collection, Feature } from 'ol'
 import VectorLayer from 'ol/layer/Vector'
 import VectorSource from 'ol/source/Vector'
 import { Geometry } from 'ol/geom'
-import { GeoJSON } from 'ol/format'
+import { GeoJSON, WKT } from 'ol/format'
 import Style from 'ol/style/Style'
 import Fill from 'ol/style/Fill'
 import Stroke from 'ol/style/Stroke'
+import { UrlLayerPair } from './graph_to_map'
+import { GEOJSON_PROJ, GML_IDENTIFIER_KEY } from '../config'
+
+const wktFormat = new WKT()
 
 type IdFeaturePair = { id: string; feature: Feature<Geometry> } | null
 
 function parseGeoJson(txt: string, targetProjection: olProj.Projection) {
   return new GeoJSON().readFeatures(txt, {
-    dataProjection: 'EPSG:3035',
+    dataProjection: GEOJSON_PROJ,
     featureProjection: targetProjection
   })
 }
 
+function loadFeatureFromWTK(
+  uri: UrlLayerPair,
+  targetProjection: olProj.Projection
+): IdFeaturePair {
+  const feature = wktFormat.readFeature(uri.wkt)
+  feature.set(GML_IDENTIFIER_KEY, uri.url)
+  const geometry = feature.getGeometry()
+  if (geometry) {
+    geometry.transform(GEOJSON_PROJ, targetProjection)
+  }
+  return { id: uri.url, feature: feature }
+}
+
 // asynchronously loads a single feature
-async function loadFeature(
+async function loadFeatureFromGeoJsonURI(
   gmlUri: string,
   targetProjection: olProj.Projection
 ): Promise<IdFeaturePair> {
@@ -41,11 +58,16 @@ async function loadFeature(
     const fetchPromise = fetch(selIdWithFormat)
       .then(response => response.text())
       .then(txt => {
-        const featureCollection = parseGeoJson(txt, targetProjection)
-        /*if(featureCollection.length > 0 && featureCollection[0].getId()) {
-          console.log("feature " +selIdWithFormat+ " loaded: " + featureCollection[0].getId())
-        }*/
-        return { id: gmlUri, feature: featureCollection[0] }
+        try {
+          const featureCollection = parseGeoJson(txt, targetProjection)
+          /*if(featureCollection.length > 0 && featureCollection[0].getId()) {
+            console.log("feature " +selIdWithFormat+ " loaded: " + featureCollection[0].getId())
+          }*/
+          return { id: gmlUri, feature: featureCollection[0] }
+        } catch (e) {
+          console.log('error parsing geojson: ' + gmlUri + ', ' + txt)
+          return undefined
+        }
       })
 
     // @ts-ignore
@@ -55,22 +77,21 @@ async function loadFeature(
   }
 }
 
-function getOrLoadFeaturesByURL(
+function loadFeaturesFromURI(
   cache: Map<string, Feature<Geometry> | null>,
-  gmlUris: string[],
+  uriLoads: UrlLayerPair[],
   targetProjection: olProj.Projection,
   featureLoadedCB: (ft: IdFeaturePair) => void
 ) {
-  // considere only features not already contained in the cache
-  const allLoads = gmlUris.filter(uri => !cache.has(uri))
-  const pendingLoads = new Set<string>(allLoads)
+  // load features from URIs
+  const pendingLoads = new Set<string>(uriLoads.map(uri => uri.url))
   // mark all non-existent urls as currently loading (feature = null)
   // so no futher attempts are made to load this multiple times
-  allLoads.forEach(uri => cache.set(uri, null))
+  uriLoads.forEach(uri => cache.set(uri.url, null))
 
   function loadUri(uri: string): Promise<any> {
     pendingLoads.delete(uri)
-    const featurePromise = loadFeature(uri, targetProjection)
+    const featurePromise = loadFeatureFromGeoJsonURI(uri, targetProjection)
     return featurePromise.then(ft => {
       if (ft) {
         cache.set(uri, ft.feature)
@@ -89,9 +110,34 @@ function getOrLoadFeaturesByURL(
   // will begin to initiate another fetch again until all open requests (pendingLoads)
   // are fulfilled.
   const PARALLEL_FETCH_COUNT = 10
-  for (let i = 0; i < Math.min(PARALLEL_FETCH_COUNT, allLoads.length); i++) {
-    loadUri(allLoads[i])
+  for (let i = 0; i < Math.min(PARALLEL_FETCH_COUNT, uriLoads.length); i++) {
+    loadUri(uriLoads[i].url)
   }
 }
 
-export { IdFeaturePair, parseGeoJson, loadFeature, getOrLoadFeaturesByURL }
+function getOrLoadFeaturesFromWKTOrURL(
+  cache: Map<string, Feature<Geometry> | null>,
+  gmlUris: UrlLayerPair[],
+  targetProjection: olProj.Projection,
+  featureLoadedCB: (ft: IdFeaturePair) => void
+) {
+  // considere only features not already contained in the cache
+  const allLoads = gmlUris.filter(uri => !cache.has(uri.url))
+
+  // load Features directly in case WKT is present
+  const wktLoads = allLoads.filter(uri => uri.wkt)
+  const wtkResults = wktLoads.map(uri => {
+    const result = loadFeatureFromWTK(uri, targetProjection)
+    if (result) {
+      cache.set(result.id, result.feature)
+    }
+    return result
+  })
+  wtkResults.forEach(result => featureLoadedCB(result))
+
+  // load features from WFS if WKT was not present
+  const uriLoads = allLoads.filter(uri => !uri.wkt)
+  loadFeaturesFromURI(cache, uriLoads, targetProjection, featureLoadedCB)
+}
+
+export { IdFeaturePair, parseGeoJson, getOrLoadFeaturesFromWKTOrURL }

@@ -25,10 +25,9 @@ import Fill from 'ol/style/Fill'
 import Stroke from 'ol/style/Stroke'
 import {
   IdFeaturePair,
-  getOrLoadFeaturesByURL,
+  getOrLoadFeaturesFromWKTOrURL,
   parseGeoJson
 } from './feature_loading'
-import { getGmlUrlFromNode, getGmlUrlsFromNodes } from './graph_to_map'
 import {
   createVectorLayer,
   VectorLayerContent,
@@ -45,15 +44,38 @@ import {
 } from './SelectLayer'
 import { selectNodeById } from './map_to_graph'
 import { RelationshipModel } from '../models/Relationship'
+import { DATA_LAYERS } from '../config'
 
 export type MapParentPlainProps = {
   mapPosition: [number, number]
-  syncGraphWithMap(zoom: number, zoomDetailLevel: number, bounds: any): void
+  syncGraphWithMap(
+    zoom: number,
+    zoomDetailLevel: number,
+    bounds: any,
+    versionId: string
+  ): void
   selectedItem: VizItem
   graph?: GraphModel
   geh?: GraphEventHandlerModel
   auStyle: 'bundeslaender' | 'bezirke' | 'gemeinden'
+  versionId: string
   syncWithGraph: boolean
+  syncWithMap: boolean
+  limitGraphToMapBounds: boolean
+}
+
+function updateGraph(props: MapParentPlainProps, map?: OLMap) {
+  if (map) {
+    const view = map.getView()
+    const extent = view.calculateExtent(map.getSize())
+    const zoom = view.getZoom() ?? 0
+    const extentTransformed = olProj.transformExtent(
+      extent,
+      view.getProjection(),
+      'EPSG:4326'
+    )
+    props.syncGraphWithMap(zoom, 14, extentTransformed, props.versionId)
+  }
 }
 
 export function MapParentPlain(props: MapParentPlainProps) {
@@ -75,6 +97,9 @@ export function MapParentPlain(props: MapParentPlainProps) {
   })
 
   const mapTargetElement = useRef<HTMLDivElement>(null)
+  const popupTargetElement = useRef<HTMLDivElement>(null)
+  const popupContentElement = useRef<HTMLDivElement>(null)
+
   const [map, setMap] = useState<OLMap | undefined>()
   const [auLayer, setAuLayer] = useState<TileLayer<TileWMS> | undefined>()
 
@@ -108,7 +133,7 @@ export function MapParentPlain(props: MapParentPlainProps) {
   useEffect(() => {
     const view = new View({
       center: props.mapPosition,
-      projection: 'EPSG:3035',
+      projection: 'EPSG:3035', //TODO - warum
       zoom: 6,
       minZoom: 0,
       maxZoom: 28
@@ -133,14 +158,12 @@ export function MapParentPlain(props: MapParentPlainProps) {
     })
 
     view.on('change', () => {
-      const extent = view.calculateExtent(map.getSize())
-      const zoom = view.getZoom() ?? 0
-      const extentTransformed = olProj.transformExtent(
-        extent,
-        view.getProjection(),
-        'EPSG:3035'
-      )
-      props.syncGraphWithMap(zoom, 10, extentTransformed)
+      if (
+        currentProps.current.syncWithMap ||
+        currentProps.current.limitGraphToMapBounds
+      ) {
+        updateGraph(currentProps.current, map)
+      }
     })
 
     map.on('singleclick', e => {
@@ -153,7 +176,7 @@ export function MapParentPlain(props: MapParentPlainProps) {
         handleSelectClick(
           e,
           featureCache.current,
-          psLayer.current,
+          psLayers.current,
           forceUpdate,
           vectorLayer,
           currentProps.current.graph,
@@ -167,6 +190,8 @@ export function MapParentPlain(props: MapParentPlainProps) {
     setMap(map)
     return () => map.setTarget('')
   }, [])
+
+  useEffect(() => updateGraph(props, map), [props.versionId])
 
   useEffect(() => {
     if (auLayer) {
@@ -182,7 +207,7 @@ export function MapParentPlain(props: MapParentPlainProps) {
           STYLES: props.auStyle,
           VERSION: '1.1.1'
         },
-        projection: 'EPSG:3035',
+        projection: 'EPSG:4326',
         serverType: 'geoserver',
         transition: 0
       })
@@ -190,57 +215,69 @@ export function MapParentPlain(props: MapParentPlainProps) {
 
     setAuLayer(newAuLayer)
     map?.addLayer(newAuLayer)
-  }, [props.auStyle, map])
+  }, [props.auStyle, props.versionId, map])
 
-  const psLayer = useRef<TileLayer<TileWMS> | null>(null)
+  const psLayers = useRef<TileLayer<TileWMS>[]>([])
   useEffect(() => {
     if (map) {
       if (props.syncWithGraph) {
-        if (psLayer.current) {
-          map.removeLayer(psLayer.current)
-          psLayer.current = null
-        }
+        psLayers.current.forEach(layer => map.removeLayer(layer))
+        psLayers.current = []
       } else {
-        psLayer.current = new TileLayer({
-          source: new TileWMS({
-            url: 'https://geoserver-admin.rest-gdi.geo-data.space/geoserver/ps/wms?service=WMS',
-            params: {
-              LAYERS: 'ps:ProtectedSite',
-              TILED: true,
-              VERSION: '1.1.1'
-            },
-            serverType: 'geoserver',
-            transition: 0
-          }),
-          zIndex: 1
-        })
+        psLayers.current.forEach(layer => map.removeLayer(layer))
+        psLayers.current = []
+        for (const layer of DATA_LAYERS) {
+          const dataLayer = new TileLayer({
+            source: new TileWMS({
+              url: layer.WMS_URL,
+              params: {
+                LAYERS: layer.LAYERS,
+                TILED: true,
+                VERSION: '1.1.1',
+                CQL_FILTER: props.versionId
+                  ? `versionId='${props.versionId}'`
+                  : undefined
+              },
+              serverType: 'geoserver',
+              projection: layer.PROJECTION,
+              transition: 0
+            }),
+            zIndex: 1
+          })
 
-        map.addLayer(psLayer.current)
+          psLayers.current.push(dataLayer)
+          map.addLayer(dataLayer)
+        }
       }
     }
-  }, [props.syncWithGraph, props.syncGraphWithMap, map])
+  }, [props.syncWithGraph, props.syncGraphWithMap, props.versionId, map])
 
+  // Set map center according to currently selected graph node
   useEffect(() => {
     const selItem = currentProps.current.selectedItem
     if (map && selItem && selItem.type === 'node') {
       const node = selItem.item as NodeModel
 
       if (node !== lastMapSelectedNode.current) {
-        const bbox = [
-          parseInt(node.propertyMap['x_min']),
-          parseInt(node.propertyMap['y_min']),
-          parseInt(node.propertyMap['x_max']),
-          parseInt(node.propertyMap['y_max'])
-        ]
-        const center = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2]
+        const bbox: number[] = []
+        try {
+          bbox.push(parseFloat(node.propertyMap['x_min'])),
+            bbox.push(parseFloat(node.propertyMap['y_min'])),
+            bbox.push(parseFloat(node.propertyMap['x_max'])),
+            bbox.push(parseFloat(node.propertyMap['y_max']))
+        } catch (e) {}
 
-        const centerView = olProj.transform(
-          center,
-          'EPSG:3035',
-          map.getView().getProjection()
-        )
+        if (bbox.filter(coord => !Number.isNaN(coord)).length === 4) {
+          const center = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2]
 
-        map.getView().setCenter(centerView)
+          const centerView = olProj.transform(
+            center,
+            'EPSG:4326',
+            map.getView().getProjection()
+          )
+
+          map.getView().setCenter(centerView)
+        }
       }
     }
   }, [props.syncWithGraph, props.syncGraphWithMap, props.selectedItem])
@@ -256,6 +293,10 @@ export function MapParentPlain(props: MapParentPlainProps) {
           position: 'relative'
         }}
       ></div>
+      <div ref={popupTargetElement} id="popup" className="ol-popup">
+        <a href="#" id="popup-closer" className="ol-popup-closer"></a>
+        <div ref={popupContentElement} id="popup-content"></div>
+      </div>
     </>
   )
 }
@@ -273,5 +314,6 @@ function registerProjections() {
     'EPSG:3035',
     '+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +towgs84=565.04,49.91,465.84,1.9848,-1.7439,9.0587,4.0772 +units=m +no_defs +type=crs'
   )
+  proj4.defs('EPSG:4326', '+proj=longlat +datum=WGS84 +no_defs +type=crs')
   register(proj4)
 }

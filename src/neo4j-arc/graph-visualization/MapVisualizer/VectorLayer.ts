@@ -10,7 +10,7 @@ import Style from 'ol/style/Style'
 import { UrlLayerPair, getGmlUrlsFromNodes } from './graph_to_map'
 import OLMap from 'ol/Map'
 import { GraphModel } from '../models/Graph'
-import { getOrLoadFeaturesByURL } from './feature_loading'
+import { getOrLoadFeaturesFromWKTOrURL } from './feature_loading'
 
 type VectorLayerContent = {
   visibleFeatures: Map<string, Feature<Geometry>>
@@ -28,15 +28,12 @@ function syncVectorLayerContent(
     url => !urlsToShow.has(url)
   )
   if (featuresToRemove.length > 0) {
-    visible.visibleFeatureCollection.clear()
-    visible.visibleFeatures.clear()
+    clearVectorLayerContent(visible)
   }
-  const featuresToAdd = nodeURLs.filter(
-    nu => !visible.visibleFeatures.has(nu.url)
-  )
-  featuresToAdd.forEach(url => {
+
+  nodeURLs.forEach(url => {
     const feature = featureCache.get(url.url)
-    if (feature) {
+    if (feature && !visible.visibleFeatures.has(url.url)) {
       visible.visibleFeatures.set(url.url, feature)
       visible.visibleFeatureCollection.push(feature)
     }
@@ -59,9 +56,9 @@ function syncVectorLayer(
   // vector nodes handling
   if (graph && syncWithGraph) {
     const nodeURLs = getGmlUrlsFromNodes(graph)
-    getOrLoadFeaturesByURL(
+    getOrLoadFeaturesFromWKTOrURL(
       featureCache,
-      nodeURLs.map(nu => nu.url),
+      nodeURLs, //.map(nu => nu.url),
       map.getView().getProjection(),
       () => forceUpdate()
     )
@@ -76,7 +73,8 @@ const idStyleMap: Map<string, Style> = new Map()
 function styleVectorFeature(feature: FeatureLike) {
   const strId = '' + feature.getId()
 
-  if (strId.indexOf('ProtectedSite') > -1) {
+  // if (strId.indexOf('ProtectedSite') > -1) {
+  {
     const preComputedStyle = idStyleMap.get(strId)
     if (preComputedStyle) {
       return preComputedStyle
@@ -98,18 +96,20 @@ function styleVectorFeature(feature: FeatureLike) {
       idStyleMap.set(strId, style)
       return style
     }
-  } else {
-    const style = new Style({
-      fill: new Fill({
-        color: 'rgba(0, 0, 255, 0.05)'
-      }),
-      stroke: new Stroke({
-        color: 'white'
-      })
-    })
-
-    return style
   }
+  // }
+  // else {
+  //   const style = new Style({
+  //     fill: new Fill({
+  //       color: 'rgba(0, 0, 255, 0.25)'
+  //     }),
+  //     stroke: new Stroke({
+  //       color: 'white'
+  //     })
+  //   })
+
+  //   return style
+  // }
 }
 
 function createVectorLayer(featureColl: Collection<Feature<Geometry>>) {

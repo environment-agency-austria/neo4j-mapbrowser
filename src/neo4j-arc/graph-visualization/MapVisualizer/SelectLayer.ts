@@ -9,7 +9,7 @@ import Stroke from 'ol/style/Stroke'
 import Style from 'ol/style/Style'
 import {
   IdFeaturePair,
-  getOrLoadFeaturesByURL,
+  getOrLoadFeaturesFromWKTOrURL,
   parseGeoJson
 } from './feature_loading'
 import TileLayer from 'ol/layer/Tile'
@@ -22,8 +22,9 @@ import { GraphModel } from '../models/Graph'
 import { DispatchWithoutAction, MutableRefObject } from 'react'
 import { NodeModel } from '../models/Node'
 import { VizItem } from '../types'
-import { getGmlUrlFromNode } from './graph_to_map'
+import { getGmlUrlLayerPairFromNode, UrlLayerPair } from './graph_to_map'
 import { Coordinate } from 'ol/coordinate'
+import { GML_IDENTIFIER_KEY } from '../config'
 
 type FeatureSelectListener = (node: NodeModel) => void
 
@@ -37,6 +38,9 @@ function closeSelectionPopup(map: OLMap) {
 }
 
 function selectSingleNode(
+  // map: OLMap,
+  // coordinate: Coordinate,
+  // clicked : boolean,
   selid: string,
   graph: GraphModel,
   geh: GraphEventHandlerModel,
@@ -47,6 +51,23 @@ function selectSingleNode(
     featureListener(node)
     //forceUpdate()
   }
+
+  // Popup for in-Map click, currnetly unused
+  // if(clicked) {
+  //   // const content = document.createElement('ol') as HTMLOListElement
+  //   // content.style.background = 'rgba(255,255,255,0.75)'
+  //   const popup = document.getElementById("popup");
+
+  //   if(popup) {
+  //   const ov = new Overlay({
+  //     element: popup,
+  //     position: coordinate,
+  //     id: 'sel',
+  //     stopEvent: false
+  //   })
+  //   map.addOverlay(ov)
+  // }
+  // }
 }
 
 function displaySelectedNodeChooser(
@@ -76,7 +97,10 @@ function displaySelectedNodeChooser(
         liElems.forEach(l => (l.style.fontWeight = ''))
         li.style.fontWeight = 'bold'
       }
-      li.onclick = () => closeSelectionPopup(map)
+      li.onclick = () => {
+        closeSelectionPopup(map)
+        selectSingleNode(li.innerText, graph, geh, featureListener)
+      }
     }
 
     const ov = new Overlay({
@@ -94,10 +118,11 @@ function displaySelectedNodeChooser(
   }
 }
 
+// Handles Click on Map for Map -> Graph interaction.
 function handleSelectClick(
   e: MapBrowserEvent<any>,
   featureCache: Map<string, Feature<Geometry> | null>,
-  psLayer: TileLayer<TileWMS> | null,
+  psLayers: TileLayer<TileWMS>[],
   forceUpdate: () => void,
   vectorLayer: VectorLayer<any>,
   graph: GraphModel,
@@ -108,8 +133,9 @@ function handleSelectClick(
 
   closeSelectionPopup(e.map)
 
-  if (psLayer) {
-    const url = psLayer
+  if (psLayers.length > 0) {
+    // TODO: Make capable of handling multiple layers
+    const url = psLayers[0]
       .getSource()
       ?.getFeatureInfoUrl(
         e.coordinate,
@@ -124,25 +150,33 @@ function handleSelectClick(
       fetch(url)
         .then(response => response.text())
         .then(txt => {
-          const featureCollection = parseGeoJson(
-            txt,
-            e.map.getView().getProjection()
-          )
-          featureCollection.forEach(ft => {
-            const url = ft.get('gml:identifier')
-            featureCache.set(url, ft)
-          })
+          // Sometimes openlayers seems to create invalid getFeatureInfo-Requests where
+          // the requested coordinates are not located in the queried tile.
+          // this results in a ServiceException: 113, 259 not in dimensions of image: 256, 256
+          // don't crash on those reposes because of invalid JSON, simply ignore them
+          try {
+            const featureCollection = parseGeoJson(
+              txt,
+              e.map.getView().getProjection()
+            )
+            featureCollection.forEach(ft => {
+              const url = ft.get(GML_IDENTIFIER_KEY)
+              featureCache.set(url, ft)
+            })
 
-          const nodeIds = featureCollection.map(ft => ft.get('gml:id'))
-          displaySelectedNodeChooser(
-            e.map,
-            e.coordinate,
-            nodeIds,
-            forceUpdate,
-            graph,
-            geh,
-            featureListener
-          )
+            const nodeIds = featureCollection.map(ft =>
+              ft.get(GML_IDENTIFIER_KEY)
+            )
+            displaySelectedNodeChooser(
+              e.map,
+              e.coordinate,
+              nodeIds,
+              forceUpdate,
+              graph,
+              geh,
+              featureListener
+            )
+          } catch (e) {}
         })
     }
   } else {
@@ -150,10 +184,10 @@ function handleSelectClick(
       layerFilter: layer => layer === vectorLayer
     })
     const vectorIds = allFeatures
-      .map(node => node.getId())
-      .filter(id => typeof id === 'string')
-      .map(id => id as string)
-      .filter(id => id.indexOf('ProtectedSite') > -1)
+      .map(ft => ft.get(GML_IDENTIFIER_KEY) as string)
+      .filter(id => id)
+      .sort()
+
     displaySelectedNodeChooser(
       e.map,
       e.coordinate,
@@ -197,15 +231,20 @@ function syncSelectLayer(
   selectedItem?: VizItem
 ) {
   if (map && selectedItem && selectedItem.type === 'node') {
-    const gmlUri = getGmlUrlFromNode(selectedItem.item as NodeModel)
-    if (gmlUri) {
-      getOrLoadFeaturesByURL(
+    const gmlUri = getGmlUrlLayerPairFromNode(selectedItem.item as NodeModel)
+    if (gmlUri.url) {
+      // const uri : UrlLayerPair = {layers : [], url : gmlUri, wkt : undefined };
+
+      // if (gmlUri)
+      //   {
+      getOrLoadFeaturesFromWKTOrURL(
         featureCache,
         [gmlUri],
         map.getView().getProjection(),
         () => forceUpdate()
       )
-      syncSelectLayerContent(gmlUri, featureCache, selection)
+      syncSelectLayerContent(gmlUri.url, featureCache, selection)
+      // }
     }
   } else {
     clearSelectLayerContent(selection)

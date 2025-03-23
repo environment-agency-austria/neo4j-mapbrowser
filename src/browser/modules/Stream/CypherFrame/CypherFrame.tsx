@@ -361,6 +361,8 @@ export class CypherFrame extends Component<CypherFrameProps, CypherFrameState> {
             isFullscreen={this.props.isFullscreen}
             result={result}
             updated={this.props.request.updated}
+            //@ts-ignore
+            originalQuery={query}
             assignVisElement={(svgElement: any, graphElement: any) => {
               this.visElement = { svgElement, graphElement, type: 'graph' }
               this.setState({ hasVis: true })

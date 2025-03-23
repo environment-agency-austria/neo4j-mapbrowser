@@ -79,6 +79,7 @@ export type VisualizationProps = {
   setNodePropertiesExpandedByDefault: (expandedByDefault: boolean) => void
   wheelZoomInfoMessageEnabled: boolean
   disableWheelZoomInfoMessage: () => void
+  originalQuery: string
 }
 
 export class Visualization extends Component<
@@ -321,6 +322,8 @@ LIMIT ${maxNewNeighbours}`
   render(): React.ReactNode {
     if (!this.state.nodes.length) return null
 
+    console.log(this.props.originalQuery)
+
     return (
       <StyledVisContainer isFullscreen={this.props.isFullscreen}>
         <div style={{ height: '50%' }}>
@@ -337,6 +340,7 @@ LIMIT ${maxNewNeighbours}`
             isFullscreen={this.props.isFullscreen}
             assignVisElement={this.props.assignVisElement}
             nodeLimitHit={this.state.nodeLimitHit}
+            originalQuery={this.props.originalQuery}
             getAutoCompleteCallback={(
               callback: (rels: BasicRelationship[], initialRun: boolean) => void
             ) => {
