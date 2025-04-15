@@ -137,7 +137,7 @@ type GraphVisualizerState = {
   syncWithMap: boolean
   syncWithGraph: boolean
   limitGraphToMapBounds: boolean
-  versionId: string
+  versionId?: string
   bounds: any
   zoom: number
 }
@@ -219,7 +219,8 @@ export class GraphVisualizer extends Component<
       hiddenLayers: [],
       loadedLayers: [],
       layer: 'gemeinden',
-      versionId: VERSIONIDS[VERSIONIDS.length - 1]
+      versionId:
+        VERSIONIDS.length > 0 ? VERSIONIDS[VERSIONIDS.length - 1] : undefined
     }
   }
 

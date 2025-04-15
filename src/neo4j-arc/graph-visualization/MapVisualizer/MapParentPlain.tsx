@@ -52,13 +52,13 @@ export type MapParentPlainProps = {
     zoom: number,
     zoomDetailLevel: number,
     bounds: any,
-    versionId: string
+    versionId?: string
   ): void
   selectedItem: VizItem
   graph?: GraphModel
   geh?: GraphEventHandlerModel
   auStyle: 'bundeslaender' | 'bezirke' | 'gemeinden'
-  versionId: string
+  versionId?: string
   syncWithGraph: boolean
   syncWithMap: boolean
   limitGraphToMapBounds: boolean
