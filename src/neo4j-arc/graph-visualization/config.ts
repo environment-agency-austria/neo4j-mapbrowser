@@ -4,6 +4,8 @@ export const GEOJSON_PROJ = urlParams.get('geojson_proj') as string // "EPSG:312
 export const GML_IDENTIFIER_KEY = urlParams.get('id_property') as string //"gml_identifier_public";
 export const WKT_KEY = urlParams.get('wkt_key') as string // "WKT";
 export const DATA_LAYERS = JSON.parse(urlParams.get('data_layers') as string)
+export const MAIN_NODE_LABEL =
+  urlParams.get('main_node_label') ?? 'FT_Invekos_Schlaege_Version' //default to FT_Invekos_Schlaege_Version, as this parameter was introduced after the final URLs were published
 /*
 [ 
 {
@@ -13,13 +15,11 @@ export const DATA_LAYERS = JSON.parse(urlParams.get('data_layers') as string)
 } 
 ]
 */
-export const VERSIONIDS = JSON.parse(
+const versionids_parsed = JSON.parse(
   urlParams.get('version_filters') as string
 ) as string[]
-// [
-//    "MFA2015", "MFA2016", "MFA2017", "MFA2018", "MFA2019", "MFA2020", "MFA2021", "MFA2022", "MFA2023", "MFA2024"
-// ]
-// ;
+
+export const VERSIONIDS = versionids_parsed ?? []
 
 console.log(VERSIONIDS)
 console.log(DATA_LAYERS)

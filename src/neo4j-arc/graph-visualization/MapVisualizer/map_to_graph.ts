@@ -6,7 +6,7 @@ import { Feature } from 'ol'
 import { Geometry } from 'ol/geom'
 import { FeatureLike } from 'ol/Feature'
 import { NodeModel } from '../models/Node'
-import { GML_IDENTIFIER_KEY } from '../config'
+import { GML_IDENTIFIER_KEY, MAIN_NODE_LABEL } from '../config'
 
 function setGraphNodes(
   newNodesAndRels: BasicNodesAndRels,
@@ -129,8 +129,7 @@ export function generateNodeBoundsQuery(bounds: any, versionId: string) {
   //   ' OPTIONAL MATCH (n)-[r]-(m) return n, r, mf';
 
   let query =
-    `MATCH(n:FT_Invekos_Schlaege_Version) WHERE ` +
-    getNodeBoundingBoxFilter(bounds)
+    `MATCH(n:${MAIN_NODE_LABEL}) WHERE ` + getNodeBoundingBoxFilter(bounds)
   if (versionId && versionId.length > 0) {
     query += ` AND n.versionId="${versionId}"`
   }
