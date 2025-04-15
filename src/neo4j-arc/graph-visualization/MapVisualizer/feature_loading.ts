@@ -126,17 +126,29 @@ function getOrLoadFeaturesFromWKTOrURL(
 
   // load Features directly in case WKT is present
   const wktLoads = allLoads.filter(uri => uri.wkt)
+  const failedWtkLoads: Set<string> = new Set()
   const wtkResults = wktLoads.map(uri => {
-    const result = loadFeatureFromWTK(uri, targetProjection)
-    if (result) {
-      cache.set(result.id, result.feature)
+    try {
+      const result = loadFeatureFromWTK(uri, targetProjection)
+      if (result) {
+        cache.set(result.id, result.feature)
+      }
+      return result
+    } catch (e) {
+      console.log('invalid wtk encountered for: ' + uri.wkt)
+      failedWtkLoads.add(uri.url)
+      return undefined
     }
-    return result
   })
-  wtkResults.forEach(result => featureLoadedCB(result))
+  const succeededWtkResults = wtkResults.filter(
+    result => result
+  ) as IdFeaturePair[]
+  succeededWtkResults.forEach(result => featureLoadedCB(result))
 
-  // load features from WFS if WKT was not present
-  const uriLoads = allLoads.filter(uri => !uri.wkt)
+  // load features from WFS if WKT was not present, or loading the WKT failed
+  const uriLoads = allLoads.filter(
+    uri => !uri.wkt || failedWtkLoads.has(uri.url)
+  )
   loadFeaturesFromURI(cache, uriLoads, targetProjection, featureLoadedCB)
 }
 
